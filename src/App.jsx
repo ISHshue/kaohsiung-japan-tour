@@ -2728,7 +2728,7 @@ function ChatTab({ theme, days, shoppingItems, isAdmin }) {
       const data = await res.json();
 
       if (!res.ok) {
-        setErrorMsg(data.error || "發生未知錯誤");
+        setErrorMsg(data.detail ? `${data.error}：${data.detail}` : (data.error || "發生未知錯誤"));
         setIsLoading(false);
         return;
       }

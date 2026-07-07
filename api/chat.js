@@ -95,10 +95,13 @@ export default async function handler(req, res) {
 
   try {
     const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey,
+        },
         body: JSON.stringify({
           contents,
           systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION_TEMPLATE(tripContextJson) }] },
@@ -109,7 +112,8 @@ export default async function handler(req, res) {
 
     if (!geminiRes.ok) {
       const errText = await geminiRes.text();
-      res.status(502).json({ error: "Gemini API 回應錯誤", detail: errText.slice(0, 500) });
+      console.error("Gemini API error:", geminiRes.status, errText); // 這行會出現在 Vercel 的 Logs 分頁
+      res.status(502).json({ error: "Gemini API 回應錯誤", detail: errText.slice(0, 800) });
       return;
     }
 
