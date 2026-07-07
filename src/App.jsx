@@ -3,6 +3,7 @@ import {
   Sun,
   Moon,
   MapPin,
+  Compass,
   ShoppingCart,
   Camera,
   UtensilsCrossed,
@@ -46,6 +47,11 @@ import {
   Send,
   Bot,
   Sparkles,
+  Coins,
+  Menu,
+  Ticket,
+  Map,
+  ExternalLink,
 } from "lucide-react";
 
 /* ======================================================================
@@ -232,12 +238,37 @@ const EMERGENCY_INFO = {
   ambulanceFire: "119",
 };
 
+// 已於 2026/07 查證的日本藥妝觀光客優惠資訊（來源：各品牌官網、旅遊媒體整理）。
+// 折扣門檻、效期每家常有調整，出發前建議實際點進官網確認一次。
+const DRUGSTORE_COUPONS = [
+  {
+    name: "松本清 マツモトキヨシ",
+    discount: "免稅 10% + 結帳出示折扣券最高 7%（未稅滿 ¥50,000 才到 7%，多數人實拿 3%）",
+    url: "https://tw.matsumotokiyoshi.net/coupon_tw",
+    note: "官網結帳前出示畫面即可，不可與其他折扣併用",
+  },
+  {
+    name: "唐吉訶德 ドン・キホーテ（驚安殿堂）",
+    discount: "免稅 10% + 未稅滿 ¥10,000 折 5% / 滿 ¥30,000 折 7%",
+    url: "https://www.donki-global.com/zhtw/",
+    note: "電子優惠券需連網開啟，結帳前手機出示條碼",
+  },
+  {
+    name: "大國藥妝 Daikoku Drug",
+    discount: "免稅 10% + 依消費金額折 3%～8%（需持台灣護照，部分分店不提供免稅）",
+    url: "https://www.daikokudrug.com/",
+    note: "優惠券多透過品牌 Facebook 專頁公告，出示貼文圖片使用",
+  },
+];
+
 // 注意：gatherAt 使用真實日期時間 ISO 字串（含時區，例如 +08:00 為台灣時間、+09:00 為日本時間）。
 // 每天的第一個「集合／出發」站若填了 gatherAt，該站的倒數計時就會自動抓正確剩餘時間。
 // 其餘天數的景點時間目前是依你提供的行程重點推算的「合理估算時間」，正式時間表出來後直接改掉即可。
 const DAYS = [
   {
     id: 1,
+    isoDate: "2026-07-09",
+    coords: { lat: 35.778975, lng: 140.372772 },
     dayLabel: "Day 1",
     dateLabel: "07/09（四）",
     cityLabel: "高雄 → 成田",
@@ -334,6 +365,8 @@ const DAYS = [
   },
   {
     id: 2,
+    isoDate: "2026-07-10",
+    coords: { lat: 36.475371, lng: 138.539418 },
     dayLabel: "Day 2",
     dateLabel: "07/10（五）",
     cityLabel: "川越 → 輕井澤",
@@ -421,6 +454,8 @@ const DAYS = [
   },
   {
     id: 3,
+    isoDate: "2026-07-11",
+    coords: { lat: 35.41932, lng: 138.85379 },
     dayLabel: "Day 3",
     dateLabel: "07/11（六）",
     cityLabel: "山中湖",
@@ -504,6 +539,8 @@ const DAYS = [
   },
   {
     id: 4,
+    isoDate: "2026-07-12",
+    coords: { lat: 35.4437, lng: 139.6503 },
     dayLabel: "Day 4",
     dateLabel: "07/12（日）",
     cityLabel: "箱根 → 鎌倉 → 橫濱",
@@ -628,6 +665,8 @@ const DAYS = [
   },
   {
     id: 5,
+    isoDate: "2026-07-13",
+    coords: { lat: 35.5878, lng: 139.7381 },
     dayLabel: "Day 5",
     dateLabel: "07/13（一）",
     cityLabel: "橫濱 → 東京",
@@ -771,6 +810,8 @@ const DAYS = [
   },
   {
     id: 6,
+    isoDate: "2026-07-14",
+    coords: { lat: 35.7148, lng: 139.7967 },
     dayLabel: "Day 6",
     dateLabel: "07/14（二）",
     cityLabel: "東京 → 高雄",
@@ -989,6 +1030,68 @@ const NEARBY_ICON = {
   mall: Building2,
   izakaya: Beer,
   drugstore: Pill,
+};
+
+// 「周邊探索」分頁專用：景點／商場／百貨／藥妝 四大類，每類只保留「最近且最有名」的一個，
+// 沒有查到符合條件的地點就誠實留空（畫面顯示「無」），不硬湊資料。
+// 已於 2026/07 逐一查證真實距離與地點名稱；備註標明依據（車程估算 / 官方步行時間 / 一般地理常識）。
+const EXPLORE_CATEGORY_ICON = {
+  attraction: Camera,
+  mall: ShoppingBag,
+  department: Building2,
+  drugstore: Pill,
+};
+
+const EXPLORE_CATEGORIES = [
+  { key: "attraction", label: "景點" },
+  { key: "mall", label: "商場" },
+  { key: "department", label: "百貨" },
+  { key: "drugstore", label: "藥妝" },
+];
+
+const NEARBY_EXPLORE_BY_DAY = {
+  1: {
+    // 成田機場周邊飯店，僅接駁車往返機場，步行範圍內幾乎沒有商業設施
+    attraction: [{ name: "成田山新勝寺", distanceLabel: "約 20～30 分鐘車程（非步行範圍）", mapsQuery: "成田山新勝寺" }],
+    mall: [],
+    department: [],
+    drugstore: [],
+  },
+  2: {
+    // 實際過夜地點在群馬縣嬬恋村北輕井澤山區度假村，步行範圍內同樣沒有商業設施
+    attraction: [{ name: "鬼押出し園", distanceLabel: "約 15～20 分鐘車程（同為嬬恋村內，需開車或請飯店協助叫車）", mapsQuery: "鬼押出し園" }],
+    mall: [],
+    department: [],
+    drugstore: [],
+  },
+  3: {
+    // 山中湖畔，鄉村地區，沒有百貨或藥妝連鎖
+    attraction: [],
+    mall: [],
+    department: [],
+    drugstore: [],
+  },
+  4: {
+    // 橫濱中華街，飯店就在朝陽門旁；查證後最近的正式百貨在橫濱車站，距離較遠故標示無
+    attraction: [{ name: "關帝廟", distanceLabel: "約 5 分鐘（中華街內）", mapsQuery: "横浜中華街 関帝廟" }],
+    mall: [],
+    department: [],
+    drugstore: [],
+  },
+  5: {
+    // 東京大森，飯店鄰近 JR 大森駅
+    attraction: [{ name: "大森貝塚遺跡庭園", distanceLabel: "約 5～8 分鐘（近大森駅）", mapsQuery: "大森貝塚遺跡庭園" }],
+    mall: [{ name: "アトレ大森", distanceLabel: "約 3 分鐘（緊鄰 JR 大森駅）", mapsQuery: "アトレ大森" }],
+    department: [],
+    drugstore: [],
+  },
+  6: {
+    // 淺草雷門周邊，查證後距離皆非常近
+    attraction: [],
+    mall: [{ name: "浅草ROX", distanceLabel: "約 5～8 分鐘（淺草在地商場）", mapsQuery: "浅草ROX" }],
+    department: [{ name: "松屋淺草", distanceLabel: "約 5 分鐘（鄰接東武淺草駅）", mapsQuery: "松屋浅草" }],
+    drugstore: [{ name: "松本清 淺草雷門2丁目店", distanceLabel: "約 1 分鐘（72 公尺，近雷門）", mapsQuery: "マツモトキヨシ 浅草雷門2丁目店" }],
+  },
 };
 
 /* ======================================================================
@@ -1647,9 +1750,77 @@ const WEATHER_ICON = {
   rain: CloudRain,
 };
 
-function WeatherCard({ theme, weather }) {
-  const Icon = WEATHER_ICON[weather.condition] || CloudSun;
-  const isRainy = weather.condition === "rain";
+// WMO 天氣代碼（Open-Meteo 使用的標準代碼）對應到卡片上的圖示分類
+function mapWmoCode(code) {
+  if (code === 0) return "sunny";
+  if (code === 1 || code === 2) return "partly";
+  if (code === 3 || code === 45 || code === 48) return "cloudy";
+  return "rain"; // 涵蓋毛毛雨、雨、陣雨、雷雨、雪等
+}
+
+function useDailyWeatherRefresh(day) {
+  const [weatherCache, setWeatherCache] = useLocalStorage("weatherCache", {});
+  const cacheRef = useRef(weatherCache);
+  cacheRef.current = weatherCache;
+  const [isFetching, setIsFetching] = useState(false);
+
+  useEffect(() => {
+    if (!day.coords || !day.isoDate) return;
+    let cancelled = false;
+
+    const maybeFetch = async () => {
+      const todayKey = new Date().toISOString().slice(0, 10);
+      const cached = cacheRef.current[day.id];
+      const isFresh = cached && cached.dateKey === todayKey;
+      if (isFresh) return;
+
+      setIsFetching(true);
+      try {
+        // Open-Meteo：免金鑰、公開可直接從瀏覽器呼叫，不需要經過後端代理
+        const url =
+          `https://api.open-meteo.com/v1/forecast?latitude=${day.coords.lat}&longitude=${day.coords.lng}` +
+          `&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weathercode` +
+          `&timezone=Asia%2FTokyo&start_date=${day.isoDate}&end_date=${day.isoDate}`;
+        const res = await fetch(url);
+        const json = await res.json();
+        const d = json?.daily;
+        if (!cancelled && d && Array.isArray(d.time) && d.time.length > 0) {
+          const result = {
+            high: Math.round(d.temperature_2m_max[0]),
+            low: Math.round(d.temperature_2m_min[0]),
+            pop: Math.round(d.precipitation_probability_max?.[0] ?? 0),
+            condition: mapWmoCode(d.weathercode[0]),
+            summary: "即時查詢（Open-Meteo）",
+          };
+          setWeatherCache((prev) => ({ ...prev, [day.id]: { dateKey: todayKey, data: result } }));
+        }
+      } catch (e) {
+        /* 靜默失敗，畫面會顯示行程裡預先估算的天氣，不會擋住使用 */
+      } finally {
+        if (!cancelled) setIsFetching(false);
+      }
+    };
+
+    maybeFetch();
+    // 每小時檢查一次日期是否換日，補抓當天預報
+    const interval = setInterval(maybeFetch, 60 * 60 * 1000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [day.id, day.coords, day.isoDate]);
+
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const cached = weatherCache[day.id];
+  const liveData = cached && cached.dateKey === todayKey ? cached.data : null;
+  return { liveData, isFetching };
+}
+
+function WeatherCard({ theme, weather, liveData, isFetching }) {
+  const display = liveData || weather;
+  const Icon = WEATHER_ICON[display.condition] || CloudSun;
+  const isRainy = display.condition === "rain";
   return (
     <div
       className="flex items-center gap-3 rounded-2xl px-4 py-3 mb-4"
@@ -1664,16 +1835,16 @@ function WeatherCard({ theme, weather }) {
           className="text-sm font-bold"
           style={{ color: theme.textPrimary, fontFamily: "'Noto Sans TC', sans-serif" }}
         >
-          {weather.high}° / {weather.low}°C
+          {display.high}° / {display.low}°C
         </p>
         <p className="text-xs mt-0.5" style={{ color: theme.textSecondary, fontFamily: "'Noto Sans TC', sans-serif" }}>
-          今日行程天氣參考（預估）
+          {isFetching ? "更新中…" : liveData ? (liveData.summary || "即時查詢") : "預估值"}
         </p>
       </div>
       <div className="flex items-center gap-1">
         <Droplets size={14} color={theme.textFaint} />
         <span className="text-xs" style={{ color: theme.textFaint, fontFamily: "'JetBrains Mono', monospace" }}>
-          {weather.pop}%
+          {display.pop}%
         </span>
       </div>
     </div>
@@ -1735,6 +1906,7 @@ function ItineraryTab({
   );
   const [editingId, setEditingId] = useState(null);
   const [editValue, setEditValue] = useState("");
+  const { liveData: liveWeather, isFetching: isWeatherFetching } = useDailyWeatherRefresh(day);
 
   // 偵測到附近景點時，自動展開該站
   useEffect(() => {
@@ -1792,7 +1964,7 @@ function ItineraryTab({
       <DaySwitcher theme={theme} days={days} dayIndex={dayIndex} setDayIndex={setDayIndex} />
 
       <div className="px-4">
-        <WeatherCard theme={theme} weather={day.weather} />
+        <WeatherCard theme={theme} weather={day.weather} liveData={liveWeather} isFetching={isWeatherFetching} />
 
         <p
           className="text-xs mb-3 flex items-center gap-1"
@@ -1800,11 +1972,11 @@ function ItineraryTab({
         >
           {isAdmin ? (
             <>
-              <Pencil size={11} /> 管理者模式：點時間旁的鉛筆圖示可調整行程時間
+              <Pencil size={11} /> 管理者模式（可編輯時間）
             </>
           ) : (
             <>
-              <Eye size={11} /> 使用者檢視：行程時間唯讀，可在各站寫個人筆記
+              <Eye size={11} /> 檢視模式
             </>
           )}
         </p>
@@ -1837,7 +2009,73 @@ function ItineraryTab({
   );
 }
 
-function ItemFormModal({ theme, isOpen, onClose, onSubmit, editingItem }) {
+function CategorySelect({ theme, categories, value, onChange, onAddCategory }) {
+  const [adding, setAdding] = useState(false);
+  const [newCat, setNewCat] = useState("");
+
+  const handleSelect = (e) => {
+    const v = e.target.value;
+    if (v === "__add__") {
+      setAdding(true);
+      return;
+    }
+    onChange(v);
+  };
+
+  const commitNewCat = () => {
+    const trimmed = newCat.trim();
+    if (!trimmed) {
+      setAdding(false);
+      return;
+    }
+    onAddCategory(trimmed);
+    onChange(trimmed);
+    setNewCat("");
+    setAdding(false);
+  };
+
+  const fieldStyle = {
+    backgroundColor: theme.bgSunken,
+    color: theme.textPrimary,
+    border: `1px solid ${theme.border}`,
+    fontFamily: "'Noto Sans TC', sans-serif",
+  };
+
+  if (adding) {
+    return (
+      <div className="flex gap-1.5">
+        <input
+          autoFocus
+          value={newCat}
+          onChange={(e) => setNewCat(e.target.value)}
+          onKeyDown={(e) => (e.key === "Enter" ? commitNewCat() : null)}
+          placeholder="新分類名稱"
+          className="flex-1 min-w-0 rounded-lg px-2.5 py-1.5 text-xs outline-none"
+          style={{ ...fieldStyle, border: `1px solid ${theme.indigoSoft}` }}
+        />
+        <button onClick={commitNewCat} className="px-2.5 rounded-lg text-xs font-bold flex-shrink-0" style={{ backgroundColor: theme.indigo, color: "#fff" }}>
+          確定
+        </button>
+        <button onClick={() => setAdding(false)} className="px-2.5 rounded-lg text-xs flex-shrink-0" style={{ backgroundColor: theme.bgSunken, color: theme.textSecondary }}>
+          取消
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <select value={value} onChange={handleSelect} className="w-full rounded-lg px-2.5 py-1.5 text-sm outline-none" style={fieldStyle}>
+      {categories.map((c) => (
+        <option key={c} value={c}>
+          {c}
+        </option>
+      ))}
+      <option value="__add__">＋ 新增分類...</option>
+    </select>
+  );
+}
+
+function ItemFormModal({ theme, isOpen, onClose, onSubmit, editingItem, categories, onAddCategory }) {
   const blank = { name: "", category: "藥妝", price: "", qty: 1, foundAt: "" };
   const [form, setForm] = useState(blank);
 
@@ -1926,24 +2164,13 @@ function ItemFormModal({ theme, isOpen, onClose, onSubmit, editingItem }) {
             <label className="text-xs font-bold mb-1 block" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
               分類
             </label>
-            <div className="flex gap-2 flex-wrap">
-              {SHOPPING_CATEGORIES.filter((c) => c !== "全部").map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => setForm((f) => ({ ...f, category: cat }))}
-                  className="px-3 py-1.5 rounded-full text-xs"
-                  style={{
-                    backgroundColor: form.category === cat ? theme.indigo : theme.bgSunken,
-                    color: form.category === cat ? "#fff" : theme.textSecondary,
-                    border: `1px solid ${form.category === cat ? theme.indigo : theme.border}`,
-                    fontFamily: "'Noto Sans TC', sans-serif",
-                    fontWeight: form.category === cat ? 700 : 500,
-                  }}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
+            <CategorySelect
+              theme={theme}
+              categories={categories}
+              value={form.category}
+              onChange={(cat) => setForm((f) => ({ ...f, category: cat }))}
+              onAddCategory={onAddCategory}
+            />
           </div>
 
           <div className="flex gap-3">
@@ -2008,7 +2235,7 @@ function ItemFormModal({ theme, isOpen, onClose, onSubmit, editingItem }) {
   );
 }
 
-function BulkPasteModal({ theme, isOpen, onClose, onConfirm }) {
+function BulkPasteModal({ theme, isOpen, onClose, onConfirm, categories, onAddCategory }) {
   const [stage, setStage] = useState("input"); // 'input' | 'preview'
   const [rawText, setRawText] = useState("");
   const [parsed, setParsed] = useState([]);
@@ -2096,7 +2323,7 @@ function BulkPasteModal({ theme, isOpen, onClose, onConfirm }) {
           {stage === "input" ? (
             <>
               <p className="text-xs mb-3" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
-                把整段文字貼進來，例如從社群貼文複製的清單。一行算一個商品，抓得到就自動填數量、價格、分類，抓不到的欄位會留空或預設數量 1，貼上後可以再檢查調整。
+                一行算一個商品，自動抓數量/價格/分類，之後可再檢查調整。
               </p>
               <textarea
                 value={rawText}
@@ -2168,21 +2395,14 @@ function BulkPasteModal({ theme, isOpen, onClose, onConfirm }) {
                             style={fieldStyle}
                           />
                         </div>
-                        <div className="flex gap-1.5 flex-wrap mb-2">
-                          {SHOPPING_CATEGORIES.filter((c) => c !== "全部").map((cat) => (
-                            <button
-                              key={cat}
-                              onClick={() => updateParsed(p.tempId, { category: cat })}
-                              className="px-2 py-0.5 rounded-full text-xs"
-                              style={{
-                                backgroundColor: p.category === cat ? theme.indigo : theme.bgSunken,
-                                color: p.category === cat ? "#fff" : theme.textSecondary,
-                                fontFamily: "'Noto Sans TC', sans-serif",
-                              }}
-                            >
-                              {cat}
-                            </button>
-                          ))}
+                        <div className="mb-2">
+                          <CategorySelect
+                            theme={theme}
+                            categories={categories}
+                            value={p.category}
+                            onChange={(cat) => updateParsed(p.tempId, { category: cat })}
+                            onAddCategory={onAddCategory}
+                          />
                         </div>
                         <div className="flex gap-2">
                           <input
@@ -2236,7 +2456,7 @@ function BulkPasteModal({ theme, isOpen, onClose, onConfirm }) {
   );
 }
 
-function ShoppingItemCard({ theme, item, isEditing, onToggleEdit, onCommit, onToggleChecked, isConfirmingDelete, onRequestDelete, onCancelDelete, onDelete }) {
+function ShoppingItemCard({ theme, item, isEditing, onToggleEdit, onCommit, onToggleChecked, isConfirmingDelete, onRequestDelete, onCancelDelete, onDelete, categories, onAddCategory }) {
   const [draft, setDraft] = useState(null);
 
   // 進入編輯模式時，建立這張卡片自己的暫存草稿
@@ -2303,23 +2523,14 @@ function ShoppingItemCard({ theme, item, isEditing, onToggleEdit, onCommit, onTo
           </button>
         </div>
 
-        <div className="flex gap-1.5 flex-wrap mb-2">
-          {SHOPPING_CATEGORIES.filter((c) => c !== "全部").map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setDraft((d) => ({ ...d, category: cat }))}
-              className="px-2.5 py-1 rounded-full text-xs"
-              style={{
-                backgroundColor: draft.category === cat ? theme.indigo : theme.bgSunken,
-                color: draft.category === cat ? "#fff" : theme.textSecondary,
-                border: `1px solid ${draft.category === cat ? theme.indigo : theme.border}`,
-                fontFamily: "'Noto Sans TC', sans-serif",
-                fontWeight: draft.category === cat ? 700 : 500,
-              }}
-            >
-              {cat}
-            </button>
-          ))}
+        <div className="mb-2">
+          <CategorySelect
+            theme={theme}
+            categories={categories}
+            value={draft.category}
+            onChange={(cat) => setDraft((d) => ({ ...d, category: cat }))}
+            onAddCategory={onAddCategory}
+          />
         </div>
 
         <div className="flex gap-2 mb-2">
@@ -2485,12 +2696,312 @@ function ShoppingItemCard({ theme, item, isEditing, onToggleEdit, onCommit, onTo
   );
 }
 
-function ShoppingTab({ theme, items, setItems }) {
+function CurrencyModal({ theme, isOpen, onClose }) {
+  const [rateCache, setRateCache] = useLocalStorage("jpyTwdRate", null); // { rate, fetchedAt }
+  const [status, setStatus] = useState("idle"); // idle | loading | ok | error
+  const [amountJPY, setAmountJPY] = useState("1000");
+
+  const RATE_MAX_AGE_MS = 6 * 60 * 60 * 1000; // 6 小時內不重複查詢
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const isFresh = rateCache && Date.now() - new Date(rateCache.fetchedAt).getTime() < RATE_MAX_AGE_MS;
+    if (isFresh) {
+      setStatus("ok");
+      return;
+    }
+
+    let cancelled = false;
+    setStatus("loading");
+    // open.er-api.com：免金鑰、公開可直接從瀏覽器呼叫的免費匯率 API
+    fetch("https://open.er-api.com/v6/latest/JPY")
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        const rate = data?.rates?.TWD;
+        if (rate) {
+          setRateCache({ rate, fetchedAt: new Date().toISOString() });
+          setStatus("ok");
+        } else {
+          setStatus("error");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setStatus("error");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const rate = rateCache?.rate;
+  const twdAmount = rate ? (Number(amountJPY.replace(/[^\d.]/g, "")) || 0) * rate : 0;
+
+  return (
+    <div
+      className="fixed inset-0 z-40 flex items-end justify-center"
+      style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full flex flex-col"
+        style={{
+          maxWidth: 430,
+          backgroundColor: theme.bgPage,
+          borderTopLeftRadius: 24,
+          borderTopRightRadius: 24,
+          overflow: "hidden",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-4 py-4" style={{ borderBottom: `1px solid ${theme.border}` }}>
+          <div className="flex items-center gap-2">
+            <Coins size={20} color={theme.indigo} />
+            <h2 className="text-base font-bold" style={{ color: theme.textPrimary, fontFamily: "'Noto Serif TC', serif" }}>
+              日圓／台幣即時換算
+            </h2>
+          </div>
+          <button onClick={onClose} className="flex items-center justify-center rounded-full" style={{ width: 30, height: 30, backgroundColor: theme.bgSunken }}>
+            <X size={15} color={theme.textSecondary} />
+          </button>
+        </div>
+
+        <div className="px-4 py-4">
+          {status === "loading" && (
+            <p className="text-sm text-center py-6" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+              查詢即時匯率中…
+            </p>
+          )}
+
+          {status === "error" && (
+            <p className="text-sm text-center py-6" style={{ color: theme.accentRed, fontFamily: "'Noto Sans TC', sans-serif" }}>
+              匯率查詢失敗，請檢查網路連線後重新打開試試
+            </p>
+          )}
+
+          {status === "ok" && rate && (
+            <>
+              <div className="rounded-2xl px-4 py-3 mb-4" style={{ backgroundColor: theme.bgSunken, border: `1px solid ${theme.border}` }}>
+                <p className="text-xs mb-1" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+                  參考匯率
+                </p>
+                <p className="text-lg font-bold" style={{ color: theme.textPrimary, fontFamily: "'JetBrains Mono', monospace" }}>
+                  ¥1 ≈ NT${rate.toFixed(4)}
+                </p>
+              </div>
+
+              <label className="text-xs font-bold mb-1 block" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+                輸入日圓金額
+              </label>
+              <input
+                value={amountJPY}
+                onChange={(e) => setAmountJPY(e.target.value)}
+                inputMode="decimal"
+                placeholder="1000"
+                className="w-full rounded-xl px-3 py-3 text-lg outline-none mb-3"
+                style={{
+                  backgroundColor: theme.bgSunken,
+                  color: theme.textPrimary,
+                  border: `1px solid ${theme.indigoSoft}`,
+                  fontFamily: "'JetBrains Mono', monospace",
+                }}
+              />
+
+              <div className="rounded-2xl px-4 py-3 flex items-center justify-between" style={{ backgroundColor: theme.bgCardHighlight, border: `1px solid ${theme.indigoSoft}` }}>
+                <span className="text-sm" style={{ color: theme.textSecondary, fontFamily: "'Noto Sans TC', sans-serif" }}>
+                  約合台幣
+                </span>
+                <span className="text-xl font-bold" style={{ color: theme.indigo, fontFamily: "'JetBrains Mono', monospace" }}>
+                  NT${twdAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                </span>
+              </div>
+
+              <p className="text-xs mt-3" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+                匯率每 6 小時更新一次，僅供參考，實際刷卡/換匯匯率以銀行公告為準
+              </p>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CouponModal({ theme, isOpen, onClose }) {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-40 flex items-end justify-center" style={{ backgroundColor: "rgba(0,0,0,0.5)" }} onClick={onClose}>
+      <div
+        className="w-full flex flex-col"
+        style={{ maxWidth: 430, maxHeight: "85vh", backgroundColor: theme.bgPage, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: "hidden" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-4 py-4" style={{ borderBottom: `1px solid ${theme.border}` }}>
+          <div className="flex items-center gap-2">
+            <Ticket size={20} color={theme.indigo} />
+            <h2 className="text-base font-bold" style={{ color: theme.textPrimary, fontFamily: "'Noto Serif TC', serif" }}>
+              日本藥妝優惠券
+            </h2>
+          </div>
+          <button onClick={onClose} className="flex items-center justify-center rounded-full" style={{ width: 30, height: 30, backgroundColor: theme.bgSunken }}>
+            <X size={15} color={theme.textSecondary} />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3">
+          {DRUGSTORE_COUPONS.map((c, i) => (
+            <div key={i} className="rounded-2xl px-4 py-3" style={{ backgroundColor: theme.bgCard, border: `1px solid ${theme.border}` }}>
+              <p className="text-sm font-bold mb-1" style={{ color: theme.textPrimary, fontFamily: "'Noto Sans TC', sans-serif" }}>
+                {c.name}
+              </p>
+              <p className="text-xs mb-1.5 leading-relaxed" style={{ color: theme.textSecondary, fontFamily: "'Noto Sans TC', sans-serif" }}>
+                {c.discount}
+              </p>
+              <p className="text-xs mb-2" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+                {c.note}
+              </p>
+              <a
+                href={c.url}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-1.5 text-xs font-bold"
+                style={{ color: theme.indigo, fontFamily: "'Noto Sans TC', sans-serif" }}
+              >
+                <ExternalLink size={12} /> 前往官網領取
+              </a>
+            </div>
+          ))}
+          <p className="text-xs mt-1" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+            以上折扣門檻與效期已於 2026 年 7 月查證，實際規則以各官網公告為準，結帳前記得先開好頁面。
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MapOverviewModal({ theme, isOpen, onClose, days }) {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-40 flex items-end justify-center" style={{ backgroundColor: "rgba(0,0,0,0.5)" }} onClick={onClose}>
+      <div
+        className="w-full flex flex-col"
+        style={{ maxWidth: 430, maxHeight: "85vh", backgroundColor: theme.bgPage, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: "hidden" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-4 py-4" style={{ borderBottom: `1px solid ${theme.border}` }}>
+          <div className="flex items-center gap-2">
+            <Map size={20} color={theme.indigo} />
+            <h2 className="text-base font-bold" style={{ color: theme.textPrimary, fontFamily: "'Noto Serif TC', serif" }}>
+              行程地圖總覽
+            </h2>
+          </div>
+          <button onClick={onClose} className="flex items-center justify-center rounded-full" style={{ width: 30, height: 30, backgroundColor: theme.bgSunken }}>
+            <X size={15} color={theme.textSecondary} />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-2">
+          {days.map((d) => {
+            const mapsUrl = d.coords
+              ? `https://www.google.com/maps/search/?api=1&query=${d.coords.lat},${d.coords.lng}`
+              : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(d.cityLabel)}`;
+            return (
+              <a
+                key={d.id}
+                href={mapsUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-3 rounded-xl px-3 py-3"
+                style={{ backgroundColor: theme.bgCard, border: `1px solid ${theme.border}`, textDecoration: "none" }}
+              >
+                <div className="flex items-center justify-center rounded-lg flex-shrink-0" style={{ width: 36, height: 36, backgroundColor: theme.bgSunken }}>
+                  <MapPin size={16} color={theme.indigo} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold" style={{ color: theme.textPrimary, fontFamily: "'Noto Sans TC', sans-serif" }}>
+                    {d.dayLabel} ・ {d.cityLabel}
+                  </p>
+                  <p className="text-xs" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+                    {d.dateLabel}
+                  </p>
+                </div>
+                <ExternalLink size={14} color={theme.textFaint} />
+              </a>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MoreMenuModal({ theme, isOpen, onClose, onOpenItinerary, onOpenCoupons, onOpenMap, onOpenCurrency }) {
+  if (!isOpen) return null;
+  const rows = [
+    { label: "行程", icon: MapPin, onClick: onOpenItinerary },
+    { label: "日本藥妝優惠券", icon: Ticket, onClick: onOpenCoupons },
+    { label: "地圖", icon: Map, onClick: onOpenMap },
+    { label: "匯率換算", icon: Coins, onClick: onOpenCurrency },
+  ];
+  return (
+    <div className="fixed inset-0 z-40 flex items-end justify-center" style={{ backgroundColor: "rgba(0,0,0,0.5)" }} onClick={onClose}>
+      <div
+        className="w-full flex flex-col"
+        style={{ maxWidth: 430, backgroundColor: theme.bgPage, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: "hidden" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-4 py-4" style={{ borderBottom: `1px solid ${theme.border}` }}>
+          <h2 className="text-base font-bold" style={{ color: theme.textPrimary, fontFamily: "'Noto Serif TC', serif" }}>
+            更多
+          </h2>
+          <button onClick={onClose} className="flex items-center justify-center rounded-full" style={{ width: 30, height: 30, backgroundColor: theme.bgSunken }}>
+            <X size={15} color={theme.textSecondary} />
+          </button>
+        </div>
+        <div className="px-4 py-3 flex flex-col gap-2 pb-6">
+          {rows.map((row) => (
+            <button
+              key={row.label}
+              onClick={() => {
+                onClose();
+                row.onClick();
+              }}
+              className="flex items-center gap-3 rounded-xl px-3 py-3"
+              style={{ backgroundColor: theme.bgCard, border: `1px solid ${theme.border}` }}
+            >
+              <div className="flex items-center justify-center rounded-lg flex-shrink-0" style={{ width: 36, height: 36, backgroundColor: theme.bgSunken }}>
+                <row.icon size={17} color={theme.indigo} />
+              </div>
+              <span className="text-sm font-bold flex-1 text-left" style={{ color: theme.textPrimary, fontFamily: "'Noto Sans TC', sans-serif" }}>
+                {row.label}
+              </span>
+              <ChevronDown size={15} color={theme.textFaint} style={{ transform: "rotate(-90deg)" }} />
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ShoppingTab({ theme, items, setItems, days, onNavigateToItinerary }) {
   const [activeCategory, setActiveCategory] = useState("全部");
   const [formOpen, setFormOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [couponOpen, setCouponOpen] = useState(false);
+  const [mapOpen, setMapOpen] = useState(false);
+  const [currencyOpen, setCurrencyOpen] = useState(false);
   const [editingCardId, setEditingCardId] = useState(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [categories, setCategories] = useLocalStorage("shoppingCategories", ["藥妝", "服飾", "零食", "伴手禮"]);
+
+  const addCategory = (name) => {
+    setCategories((prev) => (prev.includes(name) ? prev : [...prev, name]));
+  };
 
   const toggleChecked = (id) => {
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, checked: !it.checked } : it)));
@@ -2538,14 +3049,8 @@ function ShoppingTab({ theme, items, setItems }) {
         className="text-lg mb-3 px-4 flex items-center gap-2"
         style={{ color: theme.textPrimary, fontFamily: "'Noto Serif TC', serif", fontWeight: 700 }}
       >
-        購物清單
+        購物車
       </h2>
-      <p
-        className="text-xs mb-3 px-4"
-        style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}
-      >
-        點項目即可編輯名稱、分類、價格、備註與「在附近尋找」的店家；清單只存在你自己的裝置
-      </p>
 
       {priceSetCount > 0 && (
         <div className="mx-4 mb-3 flex items-center justify-between rounded-xl px-4 py-2.5" style={{ backgroundColor: theme.bgSunken, border: `1px solid ${theme.border}` }}>
@@ -2560,7 +3065,7 @@ function ShoppingTab({ theme, items, setItems }) {
 
       <div className="flex items-center justify-between px-4 pb-3 gap-2">
         <div className="flex gap-2 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-          {SHOPPING_CATEGORIES.map((cat) => {
+          {["全部", ...categories].map((cat) => {
             const active = activeCategory === cat;
             return (
               <button
@@ -2618,9 +3123,27 @@ function ShoppingTab({ theme, items, setItems }) {
             onRequestDelete={() => setConfirmDeleteId(item.id)}
             onCancelDelete={() => setConfirmDeleteId(null)}
             onDelete={() => deleteItem(item.id)}
+            categories={categories}
+            onAddCategory={addCategory}
           />
         ))}
       </div>
+
+      <button
+        onClick={() => setMoreOpen(true)}
+        className="fixed flex items-center justify-center rounded-full shadow-lg"
+        style={{
+          width: 44,
+          height: 44,
+          backgroundColor: theme.bgCard,
+          border: `1px solid ${theme.border}`,
+          bottom: 144,
+          right: "calc(50% - 203px)",
+        }}
+        aria-label="更多"
+      >
+        <Menu size={19} color={theme.textSecondary} />
+      </button>
 
       <button
         onClick={() => setFormOpen(true)}
@@ -2643,6 +3166,8 @@ function ShoppingTab({ theme, items, setItems }) {
         onClose={() => setFormOpen(false)}
         onSubmit={handleAddSubmit}
         editingItem={null}
+        categories={categories}
+        onAddCategory={addCategory}
       />
 
       <BulkPasteModal
@@ -2650,11 +3175,142 @@ function ShoppingTab({ theme, items, setItems }) {
         isOpen={bulkOpen}
         onClose={() => setBulkOpen(false)}
         onConfirm={handleBulkConfirm}
+        categories={categories}
+        onAddCategory={addCategory}
       />
+
+      <MoreMenuModal
+        theme={theme}
+        isOpen={moreOpen}
+        onClose={() => setMoreOpen(false)}
+        onOpenItinerary={onNavigateToItinerary}
+        onOpenCoupons={() => setCouponOpen(true)}
+        onOpenMap={() => setMapOpen(true)}
+        onOpenCurrency={() => setCurrencyOpen(true)}
+      />
+
+      <CouponModal theme={theme} isOpen={couponOpen} onClose={() => setCouponOpen(false)} />
+      <MapOverviewModal theme={theme} isOpen={mapOpen} onClose={() => setMapOpen(false)} days={days} />
+      <CurrencyModal theme={theme} isOpen={currencyOpen} onClose={() => setCurrencyOpen(false)} />
     </div>
   );
 }
 
+
+function NearbyExploreTab({ theme, day, days, dayIndex, setDayIndex }) {
+  const [openCategory, setOpenCategory] = useState(null);
+
+  const data = NEARBY_EXPLORE_BY_DAY[day.id] || { attraction: [], mall: [], department: [], drugstore: [] };
+
+  return (
+    <div className="pt-4 pb-6">
+      <div className="px-4">
+        <h2
+          className="text-lg mb-1"
+          style={{ color: theme.textPrimary, fontFamily: "'Noto Serif TC', serif", fontWeight: 700 }}
+        >
+          周邊探索
+        </h2>
+        <p className="text-xs mb-3" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+          依當晚住宿地點顯示，各類別已查證真實距離
+        </p>
+      </div>
+
+      <DaySwitcher theme={theme} days={days} dayIndex={dayIndex} setDayIndex={setDayIndex} />
+
+      <div className="px-4 flex flex-col gap-3">
+        {EXPLORE_CATEGORIES.map((cat) => {
+          const places = data[cat.key] || [];
+          const Icon = EXPLORE_CATEGORY_ICON[cat.key];
+          const isOpen = openCategory === cat.key;
+          const hasPlaces = places.length > 0;
+          const preview = places[0];
+
+          return (
+            <div key={cat.key} className="rounded-2xl overflow-hidden" style={{ backgroundColor: theme.bgCard, border: `1px solid ${theme.border}` }}>
+              <button
+                className="w-full text-left px-4 py-3 flex items-center gap-3"
+                onClick={() => hasPlaces && setOpenCategory((prev) => (prev === cat.key ? null : cat.key))}
+              >
+                <div className="flex items-center justify-center rounded-xl flex-shrink-0" style={{ width: 40, height: 40, backgroundColor: theme.bgSunken }}>
+                  <Icon size={19} color={hasPlaces ? theme.indigo : theme.textFaint} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold mb-0.5" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+                    {cat.label}
+                  </p>
+                  {hasPlaces ? (
+                    <>
+                      <p className="text-sm font-semibold truncate" style={{ color: theme.textPrimary, fontFamily: "'Noto Sans TC', sans-serif" }}>
+                        {preview.name}
+                      </p>
+                      <p className="text-xs mt-0.5" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+                        {preview.distanceLabel}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-sm" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+                      無
+                    </p>
+                  )}
+                </div>
+                {hasPlaces && places.length > 1 && (
+                  <span
+                    className="text-xs px-2 py-0.5 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: theme.bgSunken, color: theme.textSecondary, fontFamily: "'Noto Sans TC', sans-serif" }}
+                  >
+                    共 {places.length}
+                  </span>
+                )}
+                {hasPlaces && (
+                  <ChevronDown
+                    size={16}
+                    color={theme.textSecondary}
+                    style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s ease", flexShrink: 0 }}
+                  />
+                )}
+              </button>
+
+              {isOpen && hasPlaces && (
+                <div className="px-4 pb-3 flex flex-col gap-2">
+                  {places.map((place, i) => {
+                    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.mapsQuery)}`;
+                    return (
+                      <div key={i} className="rounded-xl px-3 py-2.5" style={{ backgroundColor: theme.bgSunken, border: `1px solid ${theme.border}` }}>
+                        <p className="text-sm font-semibold" style={{ color: theme.textPrimary, fontFamily: "'Noto Sans TC', sans-serif" }}>
+                          {place.name}
+                        </p>
+                        <p className="text-xs mt-0.5 mb-2" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+                          {place.distanceLabel}
+                        </p>
+                        <a
+                          href={mapsUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex items-center justify-center gap-1.5 rounded-lg py-2"
+                          style={{ backgroundColor: theme.indigo, textDecoration: "none" }}
+                        >
+                          <Navigation2 size={13} color="#fff" />
+                          <span className="text-xs font-bold" style={{ color: "#fff", fontFamily: "'Noto Sans TC', sans-serif" }}>
+                            導航至 Google Maps
+                          </span>
+                        </a>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        <p className="text-xs mt-1" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+          距離為查證後的估算值；顯示「無」代表步行範圍內沒有查到符合條件的真實地點，不是系統漏掉。
+        </p>
+      </div>
+    </div>
+  );
+}
 
 function ChatTab({ theme, days, shoppingItems, isAdmin }) {
   const [messages, setMessages] = useLocalStorage("chatHistory", []);
@@ -2747,13 +3403,13 @@ function ChatTab({ theme, days, shoppingItems, isAdmin }) {
   };
 
   return (
-    <div className="flex flex-col" style={{ height: "calc(100vh - 64px)" }}>
-      <div className="px-4 pt-4 pb-2 flex items-center justify-between">
+    <div className="flex-1 min-h-0 flex flex-col">
+      <div className="px-4 pt-3 pb-2 flex items-center justify-between flex-shrink-0">
         <h2
-          className="text-lg flex items-center gap-2"
+          className="text-base flex items-center gap-1.5"
           style={{ color: theme.textPrimary, fontFamily: "'Noto Serif TC', serif", fontWeight: 700 }}
         >
-          <Sparkles size={18} color={theme.indigo} />
+          <Sparkles size={16} color={theme.indigo} />
           旅遊小幫手
         </h2>
         {messages.length > 0 && (
@@ -2762,11 +3418,8 @@ function ChatTab({ theme, days, shoppingItems, isAdmin }) {
           </button>
         )}
       </div>
-      <p className="px-4 pb-3 text-xs" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
-        只回答這趟行程、購物、日語、日本旅遊相關的問題，其他話題會婉拒
-      </p>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 flex flex-col gap-3">
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-4 flex flex-col gap-3">
         {messages.length === 0 && (
           <div className="flex flex-col gap-2 mt-2">
             <div
@@ -2775,7 +3428,7 @@ function ChatTab({ theme, days, shoppingItems, isAdmin }) {
             >
               <Bot size={16} color={theme.indigo} className="flex-shrink-0 mt-0.5" />
               <p className="text-sm" style={{ color: theme.textSecondary, fontFamily: "'Noto Sans TC', sans-serif" }}>
-                你好，我知道這趟行程、購物清單、附近商家跟緊急聯絡資訊，也能聊日本旅遊實用日語跟購物常識。想問什麼？
+                行程、購物、附近商家、緊急聯絡、日語小知識都可以問。
               </p>
             </div>
             <div className="flex flex-wrap gap-2 mt-1">
@@ -2839,7 +3492,7 @@ function ChatTab({ theme, days, shoppingItems, isAdmin }) {
         <div style={{ height: 8 }} />
       </div>
 
-      <div className="px-4 py-3 flex items-center gap-2" style={{ borderTop: `1px solid ${theme.border}` }}>
+      <div className="px-4 py-3 flex items-center gap-2 flex-shrink-0" style={{ borderTop: `1px solid ${theme.border}` }}>
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -3350,7 +4003,8 @@ function Header({
 function BottomNav({ theme, activeTab, setActiveTab }) {
   const tabs = [
     { key: "itinerary", label: "今日行程", icon: MapPin },
-    { key: "shopping", label: "購物清單", icon: ShoppingCart },
+    { key: "shopping", label: "購物車", icon: ShoppingCart },
+    { key: "nearby", label: "周邊探索", icon: Compass },
     { key: "chat", label: "旅遊小幫手", icon: MessageCircle },
   ];
 
@@ -3479,7 +4133,7 @@ export default function JapanTourApp() {
           matchedStopName={matchedStop ? matchedStop.name : null}
         />
 
-        <div className="flex-1 overflow-y-auto">
+        <div className={activeTab === "chat" ? "flex-1 min-h-0 flex flex-col" : "flex-1 overflow-y-auto"}>
           {activeTab === "itinerary" && (
             <ItineraryTab
               theme={theme}
@@ -3495,7 +4149,16 @@ export default function JapanTourApp() {
             />
           )}
           {activeTab === "shopping" && (
-            <ShoppingTab theme={theme} items={shoppingItems} setItems={setShoppingItems} />
+            <ShoppingTab
+              theme={theme}
+              items={shoppingItems}
+              setItems={setShoppingItems}
+              days={daysData}
+              onNavigateToItinerary={() => setActiveTab("itinerary")}
+            />
+          )}
+          {activeTab === "nearby" && (
+            <NearbyExploreTab theme={theme} day={day} days={daysData} dayIndex={safeDayIndex} setDayIndex={setDayIndex} />
           )}
           {activeTab === "chat" && (
             <ChatTab theme={theme} days={daysData} shoppingItems={shoppingItems} isAdmin={isAdmin} />
