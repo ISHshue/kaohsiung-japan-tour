@@ -204,7 +204,8 @@ function useGeolocation(enabled) {
 /* ======================================================================
    周邊店家：OpenStreetMap（Overpass API）即時查詢
    ----------------------------------------------------------------------
-   - 免金鑰、免申請帳號，瀏覽器直接呼叫公開 API
+   - 免金鑰、免申請帳號，但 Overpass 公開伺服器不支援瀏覽器直接跨網域呼叫（沒有 CORS 標頭），
+     所以改由 /api/nearby.js 這支後端函式代為查詢，前端只呼叫自己的網域
    - Overpass 是共用的免費公共伺服器，怕被過度使用而擋掉，所以查過的結果會存 localStorage，
      7 天內同一個地點不重複查詢，非必要不要縮短這個快取時間
    - 資料完整度依地區而定：市區通常很豐富，偏遠地區可能查不到什麼，這是真實資料的樣貌，
@@ -272,26 +273,21 @@ function useNearbyOSM(cacheKey, coords, radiusMeters) {
 
       setStatus("loading");
       setErrorDetail(null);
-      const query =
-        `[out:json][timeout:25];(` +
-        `node["shop"](around:${radiusMeters},${coords.lat},${coords.lng});` +
-        `node["amenity"~"restaurant|cafe|fast_food|pharmacy"](around:${radiusMeters},${coords.lat},${coords.lng});` +
-        `node["tourism"~"attraction|viewpoint|museum|gallery"](around:${radiusMeters},${coords.lat},${coords.lng});` +
-        `node["historic"](around:${radiusMeters},${coords.lat},${coords.lng});` +
-        `);out body;`;
 
       try {
-        const res = await fetch("https://overpass-api.de/api/interpreter", {
+        // 改由自己的後端 /api/nearby 代為查詢 Overpass，避免瀏覽器端的 CORS 限制。
+        const res = await fetch("/api/nearby", {
           method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: "data=" + encodeURIComponent(query),
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ lat: coords.lat, lng: coords.lng, radius: radiusMeters }),
         });
 
+        const json = await res.json();
+
         if (!res.ok) {
-          throw new Error(`HTTP ${res.status}`);
+          throw new Error(json.error || `HTTP ${res.status}`);
         }
 
-        const json = await res.json();
         const places = (json.elements || [])
           .filter((el) => el.tags && el.tags.name && el.lat != null && el.lon != null)
           .map((el) => ({
@@ -310,8 +306,6 @@ function useNearbyOSM(cacheKey, coords, radiusMeters) {
       } catch (e) {
         if (!cancelled) {
           setStatus("error");
-          // CORS 類的錯誤瀏覽器基於安全考量不會給 JS 詳細原因，這裡能拿到的訊息通常
-          // 就只有 "Failed to fetch" 這種泛用文字；HTTP 狀態碼（如 429/504）則能正常顯示。
           setErrorDetail(e && e.message ? e.message : String(e));
         }
       }
