@@ -91,9 +91,10 @@ export default async function handler(req, res) {
   const query =
     `[out:json][timeout:25];(` +
     `node["shop"](around:${radius},${lat},${lng});` +
-    `node["amenity"~"restaurant|cafe|fast_food|pharmacy"](around:${radius},${lat},${lng});` +
+    `node["amenity"~"restaurant|cafe|fast_food|pharmacy|place_of_worship"](around:${radius},${lat},${lng});` +
     `node["tourism"~"attraction|viewpoint|museum|gallery"](around:${radius},${lat},${lng});` +
     `node["historic"](around:${radius},${lat},${lng});` +
+    `node["leisure"="park"](around:${radius},${lat},${lng});` +
     `);out body;`;
 
   const result = await queryOverpass(query);

@@ -18,7 +18,6 @@ import {
   Navigation2,
   Store,
   Building2,
-  Search,
   Pencil,
   X,
   Cloud,
@@ -53,6 +52,7 @@ import {
   ExternalLink,
   Coffee,
   Clock,
+  Tag,
 } from "lucide-react";
 
 /* ======================================================================
@@ -220,6 +220,7 @@ const OSM_CATEGORY_MAP = {
   supermarket: { key: "supermarket", label: "超市" },
   chemist: { key: "drugstore", label: "藥妝" },
   pharmacy: { key: "drugstore", label: "藥妝" },
+  cosmetics: { key: "drugstore", label: "藥妝" },
   restaurant: { key: "restaurant", label: "餐廳" },
   cafe: { key: "cafe", label: "咖啡廳" },
   fast_food: { key: "fastfood", label: "速食" },
@@ -242,7 +243,16 @@ const CATEGORY_KEY_ICON = {
 };
 
 function categorizeOsmTags(tags) {
-  if (tags.tourism || tags.historic) return { key: "attraction", label: "景點" };
+  // 景點分類放寬：日本很多知名地點是神社／寺廟／公園，OSM 常標成 place_of_worship／park
+  // 而不是 tourism/historic，只用原本那兩個標籤會漏掉一大票真實存在的景點。
+  if (
+    tags.tourism ||
+    tags.historic ||
+    tags.amenity === "place_of_worship" ||
+    tags.leisure === "park"
+  ) {
+    return { key: "attraction", label: "景點" };
+  }
   const byShop = OSM_CATEGORY_MAP[tags.shop];
   if (byShop) return byShop;
   const byAmenity = OSM_CATEGORY_MAP[tags.amenity];
@@ -859,7 +869,7 @@ const DAYS = [
   },
 ];
 
-const SHOPPING_CATEGORIES = ["全部", "藥妝", "服飾", "零食", "伴手禮"];
+const SHOPPING_CATEGORIES = ["全部", "藥妝", "零食", "伴手禮"];
 
 const SHOPPING_ITEMS = [
   {
@@ -869,88 +879,25 @@ const SHOPPING_ITEMS = [
     price: "¥2,480",
     qty: 1,
     checked: false,
-    foundAt: ["松本清", "大國藥妝"],
+    note: "",
   },
   {
     id: "p2",
-    name: "興和 EVE 止痛藥",
-    category: "藥妝",
-    price: "¥780",
-    qty: 2,
-    checked: false,
-    foundAt: ["松本清", "SUNDRUG"],
-  },
-  {
-    id: "p3",
-    name: "小林製藥 眼藥水（金）",
-    category: "藥妝",
-    price: "¥1,200",
-    qty: 3,
-    checked: true,
-    foundAt: ["唐吉訶德"],
-  },
-  {
-    id: "p4",
-    name: "UNIQLO 極輕羽絨外套",
-    category: "服飾",
-    price: "¥5,990",
-    qty: 1,
-    checked: false,
-    foundAt: ["UNIQLO 京都四条店"],
-  },
-  {
-    id: "p5",
-    name: "無印良品 舒眠頸枕",
-    category: "服飾",
-    price: "¥1,990",
-    qty: 1,
-    checked: false,
-    foundAt: ["無印良品"],
-  },
-  {
-    id: "p6",
     name: "白色戀人 12 入",
     category: "零食",
     price: "¥1,080",
     qty: 2,
     checked: false,
-    foundAt: ["唐吉訶德", "機場免稅店"],
+    note: "",
   },
   {
-    id: "p7",
-    name: "Royce 生巧克力",
-    category: "零食",
-    price: "¥900",
-    qty: 1,
-    checked: true,
-    foundAt: ["百貨地下街"],
-  },
-  {
-    id: "p8",
-    name: "KitKat 抹茶 / 酒粕限定款",
-    category: "零食",
-    price: "¥650",
-    qty: 4,
-    checked: false,
-    foundAt: ["唐吉訶德", "松本清"],
-  },
-  {
-    id: "p9",
+    id: "p3",
     name: "京都限定 御守（學業）",
     category: "伴手禮",
     price: "¥800",
     qty: 2,
     checked: false,
-    foundAt: ["北野天滿宮"],
-  },
-  {
-    id: "p10",
-    name: "清水燒 小茶杯組",
-    category: "伴手禮",
-    price: "¥3,300",
-    qty: 1,
-    checked: false,
-    foundAt: ["清水坂店家"],
+    note: "",
   },
 ];
 
@@ -1068,10 +1015,11 @@ function parseBulkShoppingText(text) {
     line = line.trim();
     if (!line) continue;
 
-    // 分類標題行，例如「藥妝：」「零食:」單獨一行 → 之後的品項都套用這個分類
-    const headerMatch = line.match(/^([\u4e00-\u9fa5]{1,6})[:：]$/);
-    if (headerMatch && SHOPPING_CATEGORIES.includes(headerMatch[1])) {
-      currentCategory = headerMatch[1];
+    // 分類標題行：整行只有「文字 + 中文冒號或英文冒號」就當作分類切換，
+    // 不限中文，也不限一定要是原本就有的分類名稱（自訂分類名稱一樣會被接受）。
+    const headerMatch = line.match(/^(.{1,20})[:：]$/);
+    if (headerMatch) {
+      currentCategory = headerMatch[1].trim();
       continue;
     }
 
@@ -1101,7 +1049,6 @@ function parseBulkShoppingText(text) {
       category: currentCategory || guessCategory(line),
       price,
       qty,
-      foundAt: [],
       note: "",
       included: true,
     });
@@ -1307,29 +1254,33 @@ function GatherCountdownBadge({ theme, isAdmin, gatherTarget, setGatherTarget, s
     setDetailOpen(false);
   };
 
-  // 尚未設定集合時間：只有管理者看得到一個小小的「設定」按鈕，一般使用者不顯示
+  // 尚未設定集合時間：只有管理者看得到一個小小的「設定」提示，一般使用者不顯示
   if (!gatherTarget) {
     if (!isAdmin) return null;
     return (
       <>
         <button
           onClick={() => setEditOpen(true)}
-          className="flex items-center justify-center"
+          className="flex items-center justify-center gap-1.5"
           style={{
             position: "fixed",
-            top: 64,
-            right: 16,
+            top: 12,
+            left: "50%",
+            transform: "translateX(-50%)",
             zIndex: 25,
-            width: 44,
-            height: 44,
-            borderRadius: "50%",
-            backgroundColor: theme.bgCard,
-            border: `1px solid ${theme.border}`,
-            boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+            height: 34,
+            padding: "0 16px",
+            borderRadius: 999,
+            backgroundColor: "#000",
+            boxShadow: "0 4px 14px rgba(0,0,0,0.35)",
+            border: "none",
           }}
           aria-label="設定集合時間"
         >
-          <Clock size={18} color={theme.textSecondary} />
+          <Clock size={14} color="rgba(255,255,255,0.6)" />
+          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.6)", fontFamily: "'Noto Sans TC', sans-serif" }}>
+            設定集合時間
+          </span>
         </button>
         <GatherEditModal
           theme={theme}
@@ -1358,31 +1309,43 @@ function GatherCountdownBadge({ theme, isAdmin, gatherTarget, setGatherTarget, s
     <>
       <button
         onClick={() => setDetailOpen(true)}
-        className="flex flex-col items-center justify-center"
+        className="flex items-center justify-center gap-2"
         style={{
           position: "fixed",
-          top: 60,
-          right: 16,
+          top: 12,
+          left: "50%",
+          transform: "translateX(-50%)",
           zIndex: 25,
-          width: 60,
-          height: 60,
-          borderRadius: "50%",
-          backgroundColor: isPast ? theme.accentRed : theme.indigo,
-          boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
+          height: 36,
+          padding: "0 18px",
+          borderRadius: 999,
+          backgroundColor: "#000",
+          boxShadow: "0 4px 14px rgba(0,0,0,0.4)",
           border: "none",
         }}
         aria-label="集合倒數"
       >
-        <span style={{ fontSize: 9, color: "rgba(255,255,255,0.85)", fontFamily: "'Noto Sans TC', sans-serif" }}>集合</span>
+        <span
+          className="rounded-full flex-shrink-0"
+          style={{
+            width: 7,
+            height: 7,
+            backgroundColor: isPast ? "#ff4d4d" : "#4dabff",
+          }}
+        />
+        <span style={{ fontSize: 11, color: "rgba(255,255,255,0.65)", fontFamily: "'Noto Sans TC', sans-serif" }}>
+          集合
+        </span>
         <span
           style={{
-            fontSize: isPast ? 10 : hh > 0 ? 12 : 14,
-            color: "#fff",
+            fontSize: 14,
+            color: isPast ? "#ff6b6b" : "#fff",
             fontWeight: 700,
             fontFamily: "'JetBrains Mono', monospace",
+            letterSpacing: 0.5,
           }}
         >
-          {isPast ? "已到" : hh > 0 ? `${hh}:${pad(mm)}` : `${pad(mm)}:${pad(ss)}`}
+          {isPast ? "已到" : hh > 0 ? `${hh}:${pad(mm)}:${pad(ss)}` : `${pad(mm)}:${pad(ss)}`}
         </span>
       </button>
 
@@ -2306,7 +2269,7 @@ function CategorySelect({ theme, categories, value, onChange, onAddCategory }) {
 }
 
 function ItemFormModal({ theme, isOpen, onClose, onSubmit, editingItem, categories, onAddCategory }) {
-  const blank = { name: "", category: "藥妝", price: "", qty: 1, foundAt: "" };
+  const blank = { name: "", category: categories[0] || "藥妝", price: "", qty: 1 };
   const [form, setForm] = useState(blank);
 
   useEffect(() => {
@@ -2316,7 +2279,6 @@ function ItemFormModal({ theme, isOpen, onClose, onSubmit, editingItem, categori
         category: editingItem.category,
         price: editingItem.price,
         qty: editingItem.qty,
-        foundAt: editingItem.foundAt.join("、"),
       });
     } else {
       setForm(blank);
@@ -2334,10 +2296,6 @@ function ItemFormModal({ theme, isOpen, onClose, onSubmit, editingItem, categori
       category: form.category,
       price: form.price.trim() || "¥—",
       qty: Number(form.qty) || 1,
-      foundAt: form.foundAt
-        .split(/[、,，]/)
-        .map((s) => s.trim())
-        .filter(Boolean),
     });
   };
 
@@ -2431,22 +2389,6 @@ function ItemFormModal({ theme, isOpen, onClose, onSubmit, editingItem, categori
             </div>
           </div>
 
-          <div>
-            <label className="text-xs font-bold mb-1 block" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
-              在附近尋找（用頓號、逗號分隔多間店）
-            </label>
-            <input
-              value={form.foundAt}
-              onChange={(e) => setForm((f) => ({ ...f, foundAt: e.target.value }))}
-              placeholder="例如：松本清、唐吉訶德"
-              className="w-full rounded-lg px-3 py-2 text-sm outline-none"
-              style={fieldStyle}
-            />
-            <p className="text-xs mt-1" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
-              這是你自己知道／打算去找的店家，每個人清單不同，這裡也會不一樣
-            </p>
-          </div>
-
           <button
             onClick={handleSubmit}
             disabled={!canSubmit}
@@ -2505,10 +2447,17 @@ function BulkPasteModal({ theme, isOpen, onClose, onConfirm, categories, onAddCa
         category: p.category,
         price: p.price.trim() || "¥—",
         qty: Number(p.qty) || 1,
-        foundAt: [],
         note: "",
         checked: false,
       }));
+
+    // 貼上文字裡如果出現了尚未存在的分類名稱（例如自訂了「3C」這類分類標題），
+    // 一併註冊進持久化的分類清單，之後篩選列跟下拉選單都會看到。
+    const newCategories = [...new Set(toAdd.map((it) => it.category))].filter(
+      (c) => c && !categories.includes(c)
+    );
+    newCategories.forEach((c) => onAddCategory(c));
+
     onConfirm(toAdd);
   };
 
@@ -2628,7 +2577,7 @@ function BulkPasteModal({ theme, isOpen, onClose, onConfirm, categories, onAddCa
                         <div className="mb-2">
                           <CategorySelect
                             theme={theme}
-                            categories={categories}
+                            categories={categories.includes(p.category) ? categories : [...categories, p.category]}
                             value={p.category}
                             onChange={(cat) => updateParsed(p.tempId, { category: cat })}
                             onAddCategory={onAddCategory}
@@ -2697,7 +2646,6 @@ function ShoppingItemCard({ theme, item, isEditing, onToggleEdit, onCommit, onTo
         category: item.category,
         price: item.price,
         qty: item.qty,
-        foundAtText: item.foundAt.join("、"),
         note: item.note || "",
       });
     }
@@ -2713,10 +2661,6 @@ function ShoppingItemCard({ theme, item, isEditing, onToggleEdit, onCommit, onTo
       category: draft.category,
       price: draft.price.trim() || "¥—",
       qty: Number(draft.qty) || 1,
-      foundAt: draft.foundAtText
-        .split(/[、,，]/)
-        .map((s) => s.trim())
-        .filter(Boolean),
       note: draft.note.trim(),
     });
   };
@@ -2780,14 +2724,6 @@ function ShoppingItemCard({ theme, item, isEditing, onToggleEdit, onCommit, onTo
             style={{ ...fieldStyle, width: 70, fontFamily: "'JetBrains Mono', monospace" }}
           />
         </div>
-
-        <input
-          value={draft.foundAtText}
-          onChange={(e) => setDraft((d) => ({ ...d, foundAtText: e.target.value }))}
-          placeholder="在附近尋找：松本清、唐吉訶德"
-          className="w-full rounded-lg px-2.5 py-1.5 text-xs outline-none mb-2"
-          style={fieldStyle}
-        />
 
         <textarea
           value={draft.note}
@@ -2866,31 +2802,6 @@ function ShoppingItemCard({ theme, item, isEditing, onToggleEdit, onCommit, onTo
           <p className="text-xs" style={{ color: theme.textSecondary, fontFamily: "'Noto Sans TC', sans-serif" }}>
             {item.note}
           </p>
-        </div>
-      )}
-
-      {item.foundAt.length > 0 && (
-        <div className="flex items-center gap-1.5 mt-2.5 flex-wrap">
-          <Search size={12} color={theme.textFaint} />
-          <span
-            className="text-xs"
-            style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}
-          >
-            在附近尋找：
-          </span>
-          {item.foundAt.map((store, i) => (
-            <span
-              key={i}
-              className="text-xs px-2 py-0.5 rounded-full"
-              style={{
-                backgroundColor: theme.bgSunken,
-                color: theme.indigo,
-                fontFamily: "'Noto Sans TC', sans-serif",
-              }}
-            >
-              {store}
-            </span>
-          ))}
         </div>
       )}
 
@@ -3168,10 +3079,101 @@ function MapOverviewModal({ theme, isOpen, onClose, days }) {
   );
 }
 
-function MoreMenuModal({ theme, isOpen, onClose, onOpenItinerary, onOpenCoupons, onOpenMap, onOpenCurrency }) {
+function CategoryManagerModal({ theme, isOpen, onClose, categories, onAddCategory, onDeleteCategory, itemCountByCategory }) {
+  const [newName, setNewName] = useState("");
+
+  if (!isOpen) return null;
+
+  const handleAdd = () => {
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    onAddCategory(trimmed);
+    setNewName("");
+  };
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-end justify-center" style={{ backgroundColor: "rgba(0,0,0,0.5)" }} onClick={onClose}>
+      <div
+        className="w-full flex flex-col"
+        style={{ maxWidth: 430, maxHeight: "85vh", backgroundColor: theme.bgPage, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: "hidden" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-4 py-4" style={{ borderBottom: `1px solid ${theme.border}` }}>
+          <div className="flex items-center gap-2">
+            <Tag size={20} color={theme.indigo} />
+            <h2 className="text-base font-bold" style={{ color: theme.textPrimary, fontFamily: "'Noto Serif TC', serif" }}>
+              管理購物分類
+            </h2>
+          </div>
+          <button onClick={onClose} className="flex items-center justify-center rounded-full" style={{ width: 30, height: 30, backgroundColor: theme.bgSunken }}>
+            <X size={15} color={theme.textSecondary} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-4 py-4">
+          <div className="flex flex-col gap-2 mb-4">
+            {categories.map((cat) => {
+              const count = itemCountByCategory[cat] || 0;
+              return (
+                <div key={cat} className="flex items-center gap-3 rounded-xl px-3 py-2.5" style={{ backgroundColor: theme.bgCard, border: `1px solid ${theme.border}` }}>
+                  <span className="text-sm font-semibold flex-1" style={{ color: theme.textPrimary, fontFamily: "'Noto Sans TC', sans-serif" }}>
+                    {cat}
+                  </span>
+                  {count > 0 && (
+                    <span className="text-xs" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+                      {count} 項商品使用中
+                    </span>
+                  )}
+                  <button
+                    onClick={() => onDeleteCategory(cat)}
+                    className="flex items-center justify-center rounded-lg flex-shrink-0"
+                    style={{ width: 28, height: 28, backgroundColor: theme.accentRedSoft }}
+                    aria-label={`刪除分類 ${cat}`}
+                  >
+                    <Trash2 size={13} color={theme.accentRed} />
+                  </button>
+                </div>
+              );
+            })}
+            {categories.length === 0 && (
+              <p className="text-xs text-center py-4" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+                目前沒有任何分類，新增一個吧
+              </p>
+            )}
+          </div>
+
+          <p className="text-xs mb-3" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+            刪除分類不會刪除商品，只是那些商品之後不會出現在分類篩選列裡，可以之後再改到別的分類。
+          </p>
+
+          <div className="flex gap-2">
+            <input
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => (e.key === "Enter" ? handleAdd() : null)}
+              placeholder="新增分類名稱"
+              className="flex-1 min-w-0 rounded-xl px-3 py-2.5 text-sm outline-none"
+              style={{ backgroundColor: theme.bgSunken, color: theme.textPrimary, border: `1px solid ${theme.indigoSoft}`, fontFamily: "'Noto Sans TC', sans-serif" }}
+            />
+            <button
+              onClick={handleAdd}
+              className="rounded-xl px-4 text-sm font-bold flex-shrink-0"
+              style={{ backgroundColor: theme.indigo, color: "#fff", fontFamily: "'Noto Sans TC', sans-serif" }}
+            >
+              新增
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MoreMenuModal({ theme, isOpen, onClose, onOpenItinerary, onOpenCoupons, onOpenMap, onOpenCurrency, onOpenCategoryManager }) {
   if (!isOpen) return null;
   const rows = [
     { label: "行程", icon: MapPin, onClick: onOpenItinerary },
+    { label: "管理購物分類", icon: Tag, onClick: onOpenCategoryManager },
     { label: "日本藥妝優惠券", icon: Ticket, onClick: onOpenCoupons },
     { label: "地圖", icon: Map, onClick: onOpenMap },
     { label: "匯率換算", icon: Coins, onClick: onOpenCurrency },
@@ -3225,13 +3227,27 @@ function ShoppingTab({ theme, items, setItems, days, onNavigateToItinerary }) {
   const [couponOpen, setCouponOpen] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
   const [currencyOpen, setCurrencyOpen] = useState(false);
+  const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
   const [editingCardId, setEditingCardId] = useState(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
-  const [categories, setCategories] = useLocalStorage("shoppingCategories", ["藥妝", "服飾", "零食", "伴手禮"]);
+  const [categories, setCategories] = useLocalStorage("shoppingCategories", ["藥妝", "零食", "伴手禮"]);
 
   const addCategory = (name) => {
     setCategories((prev) => (prev.includes(name) ? prev : [...prev, name]));
   };
+
+  const deleteCategory = (name) => {
+    setCategories((prev) => prev.filter((c) => c !== name));
+    if (activeCategory === name) setActiveCategory("全部");
+  };
+
+  const itemCountByCategory = useMemo(() => {
+    const counts = {};
+    items.forEach((it) => {
+      counts[it.category] = (counts[it.category] || 0) + 1;
+    });
+    return counts;
+  }, [items]);
 
   const toggleChecked = (id) => {
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, checked: !it.checked } : it)));
@@ -3417,11 +3433,21 @@ function ShoppingTab({ theme, items, setItems, days, onNavigateToItinerary }) {
         onOpenCoupons={() => setCouponOpen(true)}
         onOpenMap={() => setMapOpen(true)}
         onOpenCurrency={() => setCurrencyOpen(true)}
+        onOpenCategoryManager={() => setCategoryManagerOpen(true)}
       />
 
       <CouponModal theme={theme} isOpen={couponOpen} onClose={() => setCouponOpen(false)} />
       <MapOverviewModal theme={theme} isOpen={mapOpen} onClose={() => setMapOpen(false)} days={days} />
       <CurrencyModal theme={theme} isOpen={currencyOpen} onClose={() => setCurrencyOpen(false)} />
+      <CategoryManagerModal
+        theme={theme}
+        isOpen={categoryManagerOpen}
+        onClose={() => setCategoryManagerOpen(false)}
+        categories={categories}
+        onAddCategory={addCategory}
+        onDeleteCategory={deleteCategory}
+        itemCountByCategory={itemCountByCategory}
+      />
     </div>
   );
 }
@@ -3439,6 +3465,9 @@ function NearbyExploreTab({ theme, day, days, dayIndex, setDayIndex }) {
     return buckets;
   }, [allPlaces]);
 
+  const centerLabel = day.hotel ? day.hotel.name : day.cityLabel;
+  const totalBucketed = bucketed.attraction.length + bucketed.mall.length + bucketed.department.length + bucketed.drugstore.length;
+
   return (
     <div className="pt-4 pb-6">
       <div className="px-4">
@@ -3448,8 +3477,11 @@ function NearbyExploreTab({ theme, day, days, dayIndex, setDayIndex }) {
         >
           周邊探索
         </h2>
+        <p className="text-xs mb-1" style={{ color: theme.textSecondary, fontFamily: "'Noto Sans TC', sans-serif" }}>
+          以「{centerLabel}」為中心，方圓 1 公里
+        </p>
         <p className="text-xs mb-3" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
-          依當晚住宿地點即時查詢（OpenStreetMap），涵蓋度依地區而異
+          即時查詢 OpenStreetMap，涵蓋度依地區而異
         </p>
       </div>
 
@@ -3465,6 +3497,12 @@ function NearbyExploreTab({ theme, day, days, dayIndex, setDayIndex }) {
         {status === "error" && allPlaces.length === 0 && (
           <p className="text-xs text-center py-4" style={{ color: theme.accentRed, fontFamily: "'Noto Sans TC', sans-serif" }}>
             查詢失敗{errorDetail ? `（${errorDetail}）` : ""}，稍後重新整理再試
+          </p>
+        )}
+
+        {status === "ok" && allPlaces.length > 0 && totalBucketed === 0 && (
+          <p className="text-xs text-center py-3 px-2" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+            這個範圍內查到 {allPlaces.length} 筆一般資料，但沒有符合景點／商場／百貨／藥妝這幾個分類的地點
           </p>
         )}
 
@@ -4366,7 +4404,7 @@ export default function JapanTourApp() {
     >
       <div
         className="w-full flex flex-col relative"
-        style={{ maxWidth: 430, backgroundColor: theme.bgPage, minHeight: "100vh" }}
+        style={{ maxWidth: 430, backgroundColor: theme.bgPage, minHeight: "100vh", transform: "translateZ(0)" }}
       >
         <Header
           theme={theme}
