@@ -18,7 +18,6 @@ import {
   Navigation2,
   Store,
   Building2,
-  Beer,
   Search,
   Pencil,
   X,
@@ -52,6 +51,7 @@ import {
   Ticket,
   Map,
   ExternalLink,
+  Coffee,
 } from "lucide-react";
 
 /* ======================================================================
@@ -202,6 +202,121 @@ function useGeolocation(enabled) {
 }
 
 /* ======================================================================
+   周邊店家：OpenStreetMap（Overpass API）即時查詢
+   ----------------------------------------------------------------------
+   - 免金鑰、免申請帳號，瀏覽器直接呼叫公開 API
+   - Overpass 是共用的免費公共伺服器，怕被過度使用而擋掉，所以查過的結果會存 localStorage，
+     7 天內同一個地點不重複查詢，非必要不要縮短這個快取時間
+   - 資料完整度依地區而定：市區通常很豐富，偏遠地區可能查不到什麼，這是真實資料的樣貌，
+     不是程式漏掉
+   ====================================================================== */
+
+const OSM_CATEGORY_MAP = {
+  mall: { key: "mall", label: "商場" },
+  department_store: { key: "department", label: "百貨" },
+  convenience: { key: "convenience", label: "便利商店" },
+  supermarket: { key: "supermarket", label: "超市" },
+  chemist: { key: "drugstore", label: "藥妝" },
+  pharmacy: { key: "drugstore", label: "藥妝" },
+  restaurant: { key: "restaurant", label: "餐廳" },
+  cafe: { key: "cafe", label: "咖啡廳" },
+  fast_food: { key: "fastfood", label: "速食" },
+};
+
+// 圖示元件不能被 JSON.stringify 序列化（存進 localStorage 時會悄悄消失），
+// 所以分類資料本身只存 key/label 這種純文字，圖示改成渲染時才用這張表查出來。
+const CATEGORY_KEY_ICON = {
+  attraction: Camera,
+  mall: ShoppingBag,
+  department: Building2,
+  convenience: Store,
+  supermarket: ShoppingBag,
+  drugstore: Pill,
+  restaurant: UtensilsCrossed,
+  cafe: Coffee,
+  fastfood: UtensilsCrossed,
+  shop: ShoppingBag,
+  other: MapPin,
+};
+
+function categorizeOsmTags(tags) {
+  if (tags.tourism || tags.historic) return { key: "attraction", label: "景點" };
+  const byShop = OSM_CATEGORY_MAP[tags.shop];
+  if (byShop) return byShop;
+  const byAmenity = OSM_CATEGORY_MAP[tags.amenity];
+  if (byAmenity) return byAmenity;
+  if (tags.shop) return { key: "shop", label: "商店" };
+  return { key: "other", label: "其他" };
+}
+
+const OSM_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 天內不重複查詢同一地點
+
+function useNearbyOSM(cacheKey, coords, radiusMeters) {
+  const [cache, setCache] = useLocalStorage("osmCache", {});
+  const cacheRef = useRef(cache);
+  cacheRef.current = cache;
+  const [status, setStatus] = useState("idle"); // idle | loading | ok | error
+
+  useEffect(() => {
+    if (!coords || !cacheKey) return;
+    let cancelled = false;
+
+    const run = async () => {
+      const existing = cacheRef.current[cacheKey];
+      const isFresh = existing && Date.now() - existing.fetchedAt < OSM_CACHE_TTL_MS;
+      if (isFresh) {
+        setStatus("ok");
+        return;
+      }
+
+      setStatus("loading");
+      const query =
+        `[out:json][timeout:25];(` +
+        `node["shop"](around:${radiusMeters},${coords.lat},${coords.lng});` +
+        `node["amenity"~"restaurant|cafe|fast_food|pharmacy"](around:${radiusMeters},${coords.lat},${coords.lng});` +
+        `node["tourism"~"attraction|viewpoint|museum|gallery"](around:${radiusMeters},${coords.lat},${coords.lng});` +
+        `node["historic"](around:${radiusMeters},${coords.lat},${coords.lng});` +
+        `);out body;`;
+
+      try {
+        const res = await fetch("https://overpass-api.de/api/interpreter", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: "data=" + encodeURIComponent(query),
+        });
+        const json = await res.json();
+        const places = (json.elements || [])
+          .filter((el) => el.tags && el.tags.name && el.lat != null && el.lon != null)
+          .map((el) => ({
+            name: el.tags.name,
+            cat: categorizeOsmTags(el.tags),
+            dist: Math.round(distanceMeters(coords.lat, coords.lng, el.lat, el.lon)),
+            mapsQuery: el.tags.name,
+          }))
+          .sort((a, b) => a.dist - b.dist)
+          .slice(0, 40); // 上限 40 筆，避免超商業區資料量無限膨脹，反正畫面最多也只顯示前 8-10 筆
+
+        if (!cancelled) {
+          setCache((prev) => ({ ...prev, [cacheKey]: { fetchedAt: Date.now(), places } }));
+          setStatus("ok");
+        }
+      } catch (e) {
+        if (!cancelled) setStatus("error");
+      }
+    };
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cacheKey, coords?.lat, coords?.lng, radiusMeters]);
+
+  const places = cache[cacheKey]?.places || [];
+  return { places, status };
+}
+
+/* ======================================================================
    MOCK DATA — 之後可直接替換成自己的行程 / 購物清單 / 周邊資料
    ====================================================================== */
 
@@ -331,21 +446,8 @@ const DAYS = [
           "第一晚住機場周邊飯店是跨國團體行程的標準安排，主要是讓長途飛行後盡快休息，隔天一早才有體力往輕井澤方向移動。飯店鄰近機場，設施單純但乾淨好睡。",
         photoSpots: [],
         mustBuy: [],
-        nearby: {
-          remoteNotice:
-            "成田MARROAD飯店位在成田機場周邊，僅提供機場↔飯店免費接駁車，步行範圍內幾乎沒有對外店家。官方資訊顯示館內設有便利商店，訂房網站也有「步行5分鐘內有超商」的說法但未指名店家，建議入住後直接請櫃檯指引最近的選擇。",
-          places: [
-            {
-              id: "n1-1",
-              name: "飯店館內 コンビニ",
-              category: "convenience",
-              distanceLabel: "館內（免出飯店）",
-              hoursLabel: "營業時間依館方公告",
-              hoursType: "normal",
-              mapsQuery: "マロウドインターナショナルホテル成田",
-            },
-          ],
-        },
+        remoteNotice:
+          "成田MARROAD飯店位在成田機場周邊，僅提供機場↔飯店免費接駁車，步行範圍內幾乎沒有對外店家。官方資訊顯示館內設有便利商店，訂房網站也有「步行5分鐘內有超商」的說法但未指名店家，建議入住後直接請櫃檯指引最近的選擇。",
       },
       {
         id: "d1s5",
@@ -444,11 +546,8 @@ const DAYS = [
         intro: "",
         photoSpots: [],
         mustBuy: [],
-        nearby: {
-          remoteNotice:
-            "查證後發現行程表上的「HOTEL GREEN PLAZA 輕井澤」實際地址在群馬縣嬬恋村北輕井澤山區（鄰近輕井澤玩具王國），並不在輕井澤車站或銀座通周邊。住客評論提到最近的便利商店開車約5分鐘，步行範圍內沒有可靠資訊，建議晚上以飯店內的溫泉、賣店、餐廳為主，或請櫃檯協助叫車外出。",
-          places: [],
-        },
+        remoteNotice:
+          "查證後發現行程表上的「HOTEL GREEN PLAZA 輕井澤」實際地址在群馬縣嬬恋村北輕井澤山區（鄰近輕井澤玩具王國），並不在輕井澤車站或銀座通周邊。住客評論提到最近的便利商店開車約5分鐘，步行範圍內沒有可靠資訊，建議晚上以飯店內的溫泉、賣店、餐廳為主，或請櫃檯協助叫車外出。",
       },
     ],
   },
@@ -520,20 +619,6 @@ const DAYS = [
         intro: "今晚是全程唯一的溫泉飯店，建議晚餐後留時間泡湯放鬆。",
         photoSpots: [],
         mustBuy: [],
-        nearby: {
-          remoteNotice: null,
-          places: [
-            {
-              id: "n3-1",
-              name: "7-ELEVEN（山中湖エリア）",
-              category: "convenience",
-              distanceLabel: "約 10 分鐘（住客評論實測步行時間）",
-              hoursLabel: "24 小時營業",
-              hoursType: "24h",
-              mapsQuery: "セブンイレブン 山中湖",
-            },
-          ],
-        },
       },
     ],
   },
@@ -619,47 +704,6 @@ const DAYS = [
         intro: "",
         photoSpots: [],
         mustBuy: [],
-        nearby: {
-          remoteNotice: null,
-          places: [
-            {
-              id: "n4-1",
-              name: "7-ELEVEN 橫濱中華街東門店",
-              category: "convenience",
-              distanceLabel: "約 5 分鐘（含飯店到車站的路程估算）",
-              hoursLabel: "24 小時營業",
-              hoursType: "24h",
-              mapsQuery: "セブンイレブン 横浜中華街東門店",
-            },
-            {
-              id: "n4-2",
-              name: "全家便利商店 山下町店",
-              category: "convenience",
-              distanceLabel: "約 5 分鐘（含飯店到車站的路程估算）",
-              hoursLabel: "06:00-24:00",
-              hoursType: "normal",
-              mapsQuery: "ファミリーマート 山下町店 横浜",
-            },
-            {
-              id: "n4-3",
-              name: "Natural LAWSON 橫濱元町店",
-              category: "convenience",
-              distanceLabel: "約 6 分鐘（近山下公園）",
-              hoursLabel: "24 小時營業",
-              hoursType: "24h",
-              mapsQuery: "ナチュラルローソン 横浜元町店",
-            },
-            {
-              id: "n4-4",
-              name: "橫濱中華街",
-              category: "mall",
-              distanceLabel: "約 2 分鐘（飯店就在中華街朝陽門旁）",
-              hoursLabel: "多數店家營業至 21:00～22:00",
-              hoursType: "normal",
-              mapsQuery: "横浜中華街",
-            },
-          ],
-        },
       },
     ],
   },
@@ -719,57 +763,14 @@ const DAYS = [
         intro:
           "全高 634 公尺，是東京地標之一，晴天時展望台可遠眺富士山，塔下的東京ソラマチ商場（300 多間店舖）也很適合逛街購物。",
         photoSpots: ["塔身仰角構圖", "展望台俯瞰東京市區"],
-        mustBuy: [{ name: "晴空塔限定周邊", note: "ソラマチ內有多間官方紀念品與角色商店" }],
-        nearby: {
-          remoteNotice: null,
-          places: [
-            {
-              id: "n5-solamachi-1",
-              name: "ソラマチ商店街（1F 東區）",
-              category: "mall",
-              distanceLabel: "館內 1 樓，逛街最方便的一層",
-              hoursLabel: "多數店家 10:00-21:00",
-              hoursType: "normal",
-              mapsQuery: "東京ソラマチ 1F ソラマチ商店街",
-            },
-            {
-              id: "n5-solamachi-2",
-              name: "ジャパンスーベニア／TVストアゾーン（4F 西區）",
-              category: "mall",
-              distanceLabel: "館內 4 樓，江戶老舖風格的伴手禮與角色周邊區",
-              hoursLabel: "10:00-21:00",
-              hoursType: "normal",
-              mapsQuery: "東京ソラマチ 4F ジャパンスーベニア",
-            },
-            {
-              id: "n5-solamachi-3",
-              name: "Disney Store（3F）",
-              category: "mall",
-              distanceLabel: "館內 3 樓",
-              hoursLabel: "10:00-21:00",
-              hoursType: "normal",
-              mapsQuery: "ディズニーストア 東京ソラマチ",
-            },
-            {
-              id: "n5-solamachi-4",
-              name: "フードマルシェ（2F，生鮮・伴手禮甜點）",
-              category: "mall",
-              distanceLabel: "館內 2 樓",
-              hoursLabel: "10:00-21:00",
-              hoursType: "normal",
-              mapsQuery: "東京ソラマチ フードマルシェ",
-            },
-            {
-              id: "n5-solamachi-5",
-              name: "STARBUCKS RESERVE（30F，眺望富士山）",
-              category: "izakaya",
-              distanceLabel: "館內 30 樓，需搭專用電梯",
-              hoursLabel: "10:00-23:00",
-              hoursType: "late",
-              mapsQuery: "スターバックス リザーブ 東京スカイツリータウン30F",
-            },
-          ],
-        },
+        mustBuy: [
+          { name: "晴空塔限定周邊", note: "ソラマチ內有多間官方紀念品與角色商店" },
+          { name: "1F ソラマチ商店街", note: "館內 1 樓，逛街最方便的一層，30 多間店舖" },
+          { name: "4F ジャパンスーベニア／TVストアゾーン", note: "江戶老舖風格伴手禮與角色周邊區" },
+          { name: "3F Disney Store", note: "館內 3 樓" },
+          { name: "2F フードマルシェ", note: "生鮮、伴手禮甜點" },
+          { name: "30F STARBUCKS RESERVE", note: "需搭專用電梯，可眺望富士山，10:00-23:00" },
+        ],
       },
       {
         id: "d5s5",
@@ -782,29 +783,6 @@ const DAYS = [
         intro: "",
         photoSpots: [],
         mustBuy: [],
-        nearby: {
-          remoteNotice: null,
-          places: [
-            {
-              id: "n5-1",
-              name: "全家便利商店（飯店隔壁）",
-              category: "convenience",
-              distanceLabel: "約 1 分鐘（緊鄰飯店，多筆住客評論提及）",
-              hoursLabel: "多數市區店鋪為 24 小時，實際請以店家公告為準",
-              hoursType: "24h",
-              mapsQuery: "ファミリーマート 大森本町 東京",
-            },
-            {
-              id: "n5-2",
-              name: "JR大森駅前商店街",
-              category: "mall",
-              distanceLabel: "約 10 分鐘（飯店官網標示的步行時間）",
-              hoursLabel: "各店營業時間不一",
-              hoursType: "normal",
-              mapsQuery: "大森駅前 商店街",
-            },
-          ],
-        },
       },
     ],
   },
@@ -969,9 +947,8 @@ const SHOPPING_ITEMS = [
   },
 ];
 
-// 以下真實查證過的周邊資料（來源：飯店官網、訂房網站住客評論、地圖服務，2026/07 查證）
-// 直接掛在對應的行程站點（stop.nearby）上，點開該站才會顯示，不再是獨立分頁。
-// distanceLabel 標示「約」是因為沒有 Google Maps 距離矩陣 API，是依查到的步行時間資訊換算的估計值。
+// 少數位置特別偏遠（機場周邊、山區度假村）的站點，保留人工查證過的 remoteNotice 提示文字，
+// 說明「為什麼這裡幾乎查不到東西」；其餘周邊店家資訊已改為即時查詢 OpenStreetMap（見 useNearbyOSM）。
 
 /* ======================================================================
    THEME TOKENS（不使用 Tailwind 任意值，顏色一律透過 inline style 套用）
@@ -1025,16 +1002,8 @@ const CATEGORY_ICON = {
   全部: ShoppingBag,
 };
 
-const NEARBY_ICON = {
-  convenience: Store,
-  mall: Building2,
-  izakaya: Beer,
-  drugstore: Pill,
-};
-
-// 「周邊探索」分頁專用：景點／商場／百貨／藥妝 四大類，每類只保留「最近且最有名」的一個，
-// 沒有查到符合條件的地點就誠實留空（畫面顯示「無」），不硬湊資料。
-// 已於 2026/07 逐一查證真實距離與地點名稱；備註標明依據（車程估算 / 官方步行時間 / 一般地理常識）。
+// 「周邊探索」分頁專用：景點／商場／百貨／藥妝 四大類，資料改為即時查詢 OpenStreetMap（見
+// useNearbyOSM Hook），這裡只保留分類的圖示與標籤對照。
 const EXPLORE_CATEGORY_ICON = {
   attraction: Camera,
   mall: ShoppingBag,
@@ -1048,51 +1017,6 @@ const EXPLORE_CATEGORIES = [
   { key: "department", label: "百貨" },
   { key: "drugstore", label: "藥妝" },
 ];
-
-const NEARBY_EXPLORE_BY_DAY = {
-  1: {
-    // 成田機場周邊飯店，僅接駁車往返機場，步行範圍內幾乎沒有商業設施
-    attraction: [{ name: "成田山新勝寺", distanceLabel: "約 20～30 分鐘車程（非步行範圍）", mapsQuery: "成田山新勝寺" }],
-    mall: [],
-    department: [],
-    drugstore: [],
-  },
-  2: {
-    // 實際過夜地點在群馬縣嬬恋村北輕井澤山區度假村，步行範圍內同樣沒有商業設施
-    attraction: [{ name: "鬼押出し園", distanceLabel: "約 15～20 分鐘車程（同為嬬恋村內，需開車或請飯店協助叫車）", mapsQuery: "鬼押出し園" }],
-    mall: [],
-    department: [],
-    drugstore: [],
-  },
-  3: {
-    // 山中湖畔，鄉村地區，沒有百貨或藥妝連鎖
-    attraction: [],
-    mall: [],
-    department: [],
-    drugstore: [],
-  },
-  4: {
-    // 橫濱中華街，飯店就在朝陽門旁；查證後最近的正式百貨在橫濱車站，距離較遠故標示無
-    attraction: [{ name: "關帝廟", distanceLabel: "約 5 分鐘（中華街內）", mapsQuery: "横浜中華街 関帝廟" }],
-    mall: [],
-    department: [],
-    drugstore: [],
-  },
-  5: {
-    // 東京大森，飯店鄰近 JR 大森駅
-    attraction: [{ name: "大森貝塚遺跡庭園", distanceLabel: "約 5～8 分鐘（近大森駅）", mapsQuery: "大森貝塚遺跡庭園" }],
-    mall: [{ name: "アトレ大森", distanceLabel: "約 3 分鐘（緊鄰 JR 大森駅）", mapsQuery: "アトレ大森" }],
-    department: [],
-    drugstore: [],
-  },
-  6: {
-    // 淺草雷門周邊，查證後距離皆非常近
-    attraction: [],
-    mall: [{ name: "浅草ROX", distanceLabel: "約 5～8 分鐘（淺草在地商場）", mapsQuery: "浅草ROX" }],
-    department: [{ name: "松屋淺草", distanceLabel: "約 5 分鐘（鄰接東武淺草駅）", mapsQuery: "松屋浅草" }],
-    drugstore: [{ name: "松本清 淺草雷門2丁目店", distanceLabel: "約 1 分鐘（72 公尺，近雷門）", mapsQuery: "マツモトキヨシ 浅草雷門2丁目店" }],
-  },
-};
 
 /* ======================================================================
    購物清單批次貼上：文字解析工具
@@ -1287,15 +1211,9 @@ function CountdownTicket({ theme, targetTime }) {
   );
 }
 
-function NearbyPlaceRow({ theme, place }) {
+function OsmPlaceRow({ theme, place }) {
   const [isOpen, setIsOpen] = useState(false);
-  const Icon = NEARBY_ICON[place.category] || Store;
-  const hs =
-    place.hoursType === "24h"
-      ? { color: theme.green, bg: theme.greenSoft }
-      : place.hoursType === "late"
-      ? { color: theme.orange, bg: theme.orangeSoft }
-      : { color: theme.textSecondary, bg: theme.bgCard };
+  const Icon = CATEGORY_KEY_ICON[place.cat.key] || MapPin;
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.mapsQuery)}`;
 
   return (
@@ -1308,14 +1226,9 @@ function NearbyPlaceRow({ theme, place }) {
           <p className="text-xs font-semibold truncate" style={{ color: theme.textPrimary, fontFamily: "'Noto Sans TC', sans-serif" }}>
             {place.name}
           </p>
-          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-            <span className="text-xs" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
-              {place.distanceLabel}
-            </span>
-            <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ backgroundColor: hs.bg, color: hs.color, fontFamily: "'Noto Sans TC', sans-serif", fontWeight: 700 }}>
-              {place.hoursLabel}
-            </span>
-          </div>
+          <p className="text-xs mt-0.5" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+            {place.cat.label} ・ 約 {place.dist} 公尺
+          </p>
         </div>
         <ChevronDown size={14} color={theme.textSecondary} style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s ease", flexShrink: 0 }} />
       </button>
@@ -1333,6 +1246,50 @@ function NearbyPlaceRow({ theme, place }) {
               導航至 Google Maps
             </span>
           </a>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NearbyLiveSection({ theme, cacheKey, coords, radiusMeters }) {
+  const { places, status } = useNearbyOSM(cacheKey, coords, radiusMeters);
+
+  return (
+    <div className="mt-4">
+      <div className="flex items-center gap-1.5 mb-2">
+        <Store size={15} color={theme.green} />
+        <span className="text-sm font-bold" style={{ color: theme.textPrimary, fontFamily: "'Noto Sans TC', sans-serif" }}>
+          附近特色商家
+        </span>
+        <span className="text-xs ml-auto" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+          OpenStreetMap
+        </span>
+      </div>
+
+      {status === "loading" && places.length === 0 && (
+        <p className="text-xs" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+          查詢中…
+        </p>
+      )}
+
+      {status === "error" && places.length === 0 && (
+        <p className="text-xs" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+          查詢失敗，可能是網路問題或暫時查詢額度限制，稍後重新整理再試
+        </p>
+      )}
+
+      {status === "ok" && places.length === 0 && (
+        <p className="text-xs" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+          這個範圍內沒有查到有登記店名的資料，實際情況以現場為準
+        </p>
+      )}
+
+      {places.length > 0 && (
+        <div className="flex flex-col gap-2">
+          {places.slice(0, 8).map((p, i) => (
+            <OsmPlaceRow key={i} theme={theme} place={p} />
+          ))}
         </div>
       )}
     </div>
@@ -1661,42 +1618,20 @@ function TimelineStop({
               </div>
             )}
 
-            {stop.nearby && (
-              <div className="mt-4">
-                <div className="flex items-center gap-1.5 mb-2">
-                  <Store size={15} color={theme.green} />
-                  <span
-                    className="text-sm font-bold"
-                    style={{ color: theme.textPrimary, fontFamily: "'Noto Sans TC', sans-serif" }}
-                  >
-                    附近好買・好逛
-                  </span>
-                </div>
-
-                {stop.nearby.remoteNotice && (
-                  <div
-                    className="flex items-start gap-2 rounded-xl px-3 py-2.5 mb-2"
-                    style={{ backgroundColor: theme.orangeSoft, border: `1px solid ${theme.orange}` }}
-                  >
-                    <AlertTriangle size={14} color={theme.orange} className="flex-shrink-0 mt-0.5" />
-                    <p className="text-xs leading-relaxed" style={{ color: theme.textPrimary, fontFamily: "'Noto Sans TC', sans-serif" }}>
-                      {stop.nearby.remoteNotice}
-                    </p>
-                  </div>
-                )}
-
-                {stop.nearby.places.length === 0 && !stop.nearby.remoteNotice && (
-                  <p className="text-xs" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
-                    這站附近沒有查到需要特別介紹的店家
-                  </p>
-                )}
-
-                <div className="flex flex-col gap-2">
-                  {stop.nearby.places.map((place) => (
-                    <NearbyPlaceRow key={place.id} theme={theme} place={place} />
-                  ))}
-                </div>
+            {stop.remoteNotice && (
+              <div
+                className="flex items-start gap-2 rounded-xl px-3 py-2.5 mt-4"
+                style={{ backgroundColor: theme.orangeSoft, border: `1px solid ${theme.orange}` }}
+              >
+                <AlertTriangle size={14} color={theme.orange} className="flex-shrink-0 mt-0.5" />
+                <p className="text-xs leading-relaxed" style={{ color: theme.textPrimary, fontFamily: "'Noto Sans TC', sans-serif" }}>
+                  {stop.remoteNotice}
+                </p>
               </div>
+            )}
+
+            {stop.coords && (
+              <NearbyLiveSection theme={theme} cacheKey={stop.id} coords={stop.coords} radiusMeters={350} />
             )}
 
             {isCurrent && stop.gatherAt && (
@@ -3199,8 +3134,15 @@ function ShoppingTab({ theme, items, setItems, days, onNavigateToItinerary }) {
 
 function NearbyExploreTab({ theme, day, days, dayIndex, setDayIndex }) {
   const [openCategory, setOpenCategory] = useState(null);
+  const { places: allPlaces, status } = useNearbyOSM(`day-${day.id}`, day.coords, 1000);
 
-  const data = NEARBY_EXPLORE_BY_DAY[day.id] || { attraction: [], mall: [], department: [], drugstore: [] };
+  const bucketed = useMemo(() => {
+    const buckets = { attraction: [], mall: [], department: [], drugstore: [] };
+    allPlaces.forEach((p) => {
+      if (buckets[p.cat.key]) buckets[p.cat.key].push(p);
+    });
+    return buckets;
+  }, [allPlaces]);
 
   return (
     <div className="pt-4 pb-6">
@@ -3212,19 +3154,31 @@ function NearbyExploreTab({ theme, day, days, dayIndex, setDayIndex }) {
           周邊探索
         </h2>
         <p className="text-xs mb-3" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
-          依當晚住宿地點顯示，各類別已查證真實距離
+          依當晚住宿地點即時查詢（OpenStreetMap），涵蓋度依地區而異
         </p>
       </div>
 
       <DaySwitcher theme={theme} days={days} dayIndex={dayIndex} setDayIndex={setDayIndex} />
 
       <div className="px-4 flex flex-col gap-3">
+        {status === "loading" && allPlaces.length === 0 && (
+          <p className="text-xs text-center py-4" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+            查詢中…
+          </p>
+        )}
+
+        {status === "error" && allPlaces.length === 0 && (
+          <p className="text-xs text-center py-4" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+            查詢失敗，可能是網路問題，稍後重新整理再試
+          </p>
+        )}
+
         {EXPLORE_CATEGORIES.map((cat) => {
-          const places = data[cat.key] || [];
+          const catPlaces = bucketed[cat.key] || [];
           const Icon = EXPLORE_CATEGORY_ICON[cat.key];
           const isOpen = openCategory === cat.key;
-          const hasPlaces = places.length > 0;
-          const preview = places[0];
+          const hasPlaces = catPlaces.length > 0;
+          const preview = catPlaces[0];
 
           return (
             <div key={cat.key} className="rounded-2xl overflow-hidden" style={{ backgroundColor: theme.bgCard, border: `1px solid ${theme.border}` }}>
@@ -3245,21 +3199,21 @@ function NearbyExploreTab({ theme, day, days, dayIndex, setDayIndex }) {
                         {preview.name}
                       </p>
                       <p className="text-xs mt-0.5" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
-                        {preview.distanceLabel}
+                        約 {preview.dist} 公尺
                       </p>
                     </>
                   ) : (
                     <p className="text-sm" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
-                      無
+                      {status === "loading" ? "查詢中…" : "無"}
                     </p>
                   )}
                 </div>
-                {hasPlaces && places.length > 1 && (
+                {hasPlaces && catPlaces.length > 1 && (
                   <span
                     className="text-xs px-2 py-0.5 rounded-full flex-shrink-0"
                     style={{ backgroundColor: theme.bgSunken, color: theme.textSecondary, fontFamily: "'Noto Sans TC', sans-serif" }}
                   >
-                    共 {places.length}
+                    共 {catPlaces.length}
                   </span>
                 )}
                 {hasPlaces && (
@@ -3273,7 +3227,7 @@ function NearbyExploreTab({ theme, day, days, dayIndex, setDayIndex }) {
 
               {isOpen && hasPlaces && (
                 <div className="px-4 pb-3 flex flex-col gap-2">
-                  {places.map((place, i) => {
+                  {catPlaces.slice(0, 10).map((place, i) => {
                     const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.mapsQuery)}`;
                     return (
                       <div key={i} className="rounded-xl px-3 py-2.5" style={{ backgroundColor: theme.bgSunken, border: `1px solid ${theme.border}` }}>
@@ -3281,7 +3235,7 @@ function NearbyExploreTab({ theme, day, days, dayIndex, setDayIndex }) {
                           {place.name}
                         </p>
                         <p className="text-xs mt-0.5 mb-2" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
-                          {place.distanceLabel}
+                          約 {place.dist} 公尺
                         </p>
                         <a
                           href={mapsUrl}
@@ -3305,7 +3259,7 @@ function NearbyExploreTab({ theme, day, days, dayIndex, setDayIndex }) {
         })}
 
         <p className="text-xs mt-1" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
-          距離為查證後的估算值；顯示「無」代表步行範圍內沒有查到符合條件的真實地點，不是系統漏掉。
+          資料來自 OpenStreetMap 社群協作地圖，即時查詢、7 天內快取；顯示「無」代表方圓 1 公里內沒有查到符合條件且有登記店名的地點，不是系統漏掉。
         </p>
       </div>
     </div>
@@ -3344,7 +3298,7 @@ function ChatTab({ theme, days, shoppingItems, isAdmin }) {
         intro: s.intro,
         photoSpots: s.photoSpots,
         mustBuy: s.mustBuy,
-        nearby: s.nearby,
+        remoteNotice: s.remoteNotice,
         flight: s.flight,
       })),
     })),
