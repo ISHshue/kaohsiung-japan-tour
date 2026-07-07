@@ -1100,10 +1100,10 @@ function GatherEditModal({ theme, isOpen, onClose, onSave, onClear, initialLabel
     <div className="fixed inset-0 z-40 flex items-end justify-center" style={{ backgroundColor: "rgba(0,0,0,0.5)" }} onClick={onClose}>
       <div
         className="w-full flex flex-col"
-        style={{ maxWidth: 430, backgroundColor: theme.bgPage, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: "hidden" }}
+        style={{ maxWidth: 430, maxHeight: "85vh", backgroundColor: theme.bgPage, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: "hidden" }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-4 py-4" style={{ borderBottom: `1px solid ${theme.border}` }}>
+        <div className="flex items-center justify-between px-4 py-4 flex-shrink-0" style={{ borderBottom: `1px solid ${theme.border}` }}>
           <div className="flex items-center gap-2">
             <Clock size={20} color={theme.indigo} />
             <h2 className="text-base font-bold" style={{ color: theme.textPrimary, fontFamily: "'Noto Serif TC', serif" }}>
@@ -1115,7 +1115,7 @@ function GatherEditModal({ theme, isOpen, onClose, onSave, onClear, initialLabel
           </button>
         </div>
 
-        <div className="px-4 py-4 flex flex-col gap-3">
+        <div className="px-4 py-4 flex flex-col gap-3 overflow-y-auto min-h-0">
           <div>
             <label className="text-xs font-bold mb-1 block" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
               地點／說明（已依目前定位建議帶入，可自行修改）
@@ -1146,10 +1146,12 @@ function GatherEditModal({ theme, isOpen, onClose, onSave, onClear, initialLabel
               }}
             />
           </div>
+        </div>
 
+        <div className="px-4 pb-4 pt-1 flex-shrink-0 flex flex-col gap-2">
           <button
             onClick={handleSave}
-            className="w-full rounded-xl py-3 text-sm font-bold mt-1"
+            className="w-full rounded-xl py-3 text-sm font-bold"
             style={{ backgroundColor: theme.indigo, color: "#fff", fontFamily: "'Noto Sans TC', sans-serif" }}
           >
             {hasExisting ? "更新集合時間" : "開始倒數"}
@@ -1186,7 +1188,7 @@ function GatherDetailPopover({ theme, isOpen, onClose, gatherTarget, now, isAdmi
     <div className="fixed inset-0 z-40 flex items-end justify-center" style={{ backgroundColor: "rgba(0,0,0,0.5)" }} onClick={onClose}>
       <div
         className="w-full flex flex-col items-center"
-        style={{ maxWidth: 430, backgroundColor: theme.bgPage, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: "28px 20px" }}
+        style={{ maxWidth: 430, maxHeight: "85vh", backgroundColor: theme.bgPage, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: "28px 20px", overflowY: "auto" }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-1.5 mb-1">
@@ -1264,7 +1266,7 @@ function GatherCountdownBadge({ theme, isAdmin, gatherTarget, setGatherTarget, s
           className="flex items-center justify-center gap-1.5"
           style={{
             position: "fixed",
-            top: 12,
+            top: 68,
             left: "50%",
             transform: "translateX(-50%)",
             zIndex: 25,
@@ -1312,7 +1314,7 @@ function GatherCountdownBadge({ theme, isAdmin, gatherTarget, setGatherTarget, s
         className="flex items-center justify-center gap-2"
         style={{
           position: "fixed",
-          top: 12,
+          top: 68,
           left: "50%",
           transform: "translateX(-50%)",
           zIndex: 25,
@@ -2892,14 +2894,17 @@ function CurrencyModal({ theme, isOpen, onClose }) {
         className="w-full flex flex-col"
         style={{
           maxWidth: 430,
+          maxHeight: "85vh",
           backgroundColor: theme.bgPage,
           borderTopLeftRadius: 24,
           borderTopRightRadius: 24,
           overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-4 py-4" style={{ borderBottom: `1px solid ${theme.border}` }}>
+        <div className="flex items-center justify-between px-4 py-4 flex-shrink-0" style={{ borderBottom: `1px solid ${theme.border}` }}>
           <div className="flex items-center gap-2">
             <Coins size={20} color={theme.indigo} />
             <h2 className="text-base font-bold" style={{ color: theme.textPrimary, fontFamily: "'Noto Serif TC', serif" }}>
@@ -2911,7 +2916,7 @@ function CurrencyModal({ theme, isOpen, onClose }) {
           </button>
         </div>
 
-        <div className="px-4 py-4">
+        <div className="px-4 py-4 overflow-y-auto min-h-0">
           {status === "loading" && (
             <p className="text-sm text-center py-6" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
               查詢即時匯率中…
@@ -4404,7 +4409,7 @@ export default function JapanTourApp() {
     >
       <div
         className="w-full flex flex-col relative"
-        style={{ maxWidth: 430, backgroundColor: theme.bgPage, minHeight: "100vh", transform: "translateZ(0)" }}
+        style={{ maxWidth: 430, backgroundColor: theme.bgPage, minHeight: "100vh" }}
       >
         <Header
           theme={theme}
