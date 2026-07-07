@@ -60,14 +60,23 @@ export default async function handler(req, res) {
   try {
     const overpassRes = await fetch("https://overpass-api.de/api/interpreter", {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Accept: "application/json",
+        // Overpass API 的使用規範明確要求呼叫端設定可辨識身份的 User-Agent，
+        // 沒有的話容易被伺服器的防護機制當成機器人擋下（406 Not Acceptable 常見成因之一）。
+        "User-Agent": "KaohsiungJapanTourApp/1.0 (personal travel itinerary app; not for commercial use)",
+      },
       body: "data=" + encodeURIComponent(query),
     });
 
     if (!overpassRes.ok) {
       const errText = await overpassRes.text();
       console.error("Overpass error:", overpassRes.status, errText.slice(0, 300));
-      res.status(502).json({ error: `Overpass 回應錯誤（HTTP ${overpassRes.status}）` });
+      res.status(502).json({
+        error: `Overpass 回應錯誤（HTTP ${overpassRes.status}）`,
+        detail: errText.slice(0, 300),
+      });
       return;
     }
 

@@ -285,7 +285,7 @@ function useNearbyOSM(cacheKey, coords, radiusMeters) {
         const json = await res.json();
 
         if (!res.ok) {
-          throw new Error(json.error || `HTTP ${res.status}`);
+          throw new Error(json.detail ? `${json.error}：${json.detail}` : (json.error || `HTTP ${res.status}`));
         }
 
         const places = (json.elements || [])
