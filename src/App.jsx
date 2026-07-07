@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Sun,
   Moon,
   MapPin,
   ShoppingCart,
-  Compass,
   Camera,
   UtensilsCrossed,
   BusFront,
@@ -15,7 +14,6 @@ import {
   Cookie,
   Gift,
   ShoppingBag,
-  Footprints,
   Navigation2,
   Store,
   Building2,
@@ -42,6 +40,12 @@ import {
   Trash2,
   AlertTriangle,
   LocateFixed,
+  ClipboardList,
+  Wand2,
+  MessageCircle,
+  Send,
+  Bot,
+  Sparkles,
 } from "lucide-react";
 
 /* ======================================================================
@@ -296,6 +300,21 @@ const DAYS = [
           "第一晚住機場周邊飯店是跨國團體行程的標準安排，主要是讓長途飛行後盡快休息，隔天一早才有體力往輕井澤方向移動。飯店鄰近機場，設施單純但乾淨好睡。",
         photoSpots: [],
         mustBuy: [],
+        nearby: {
+          remoteNotice:
+            "成田MARROAD飯店位在成田機場周邊，僅提供機場↔飯店免費接駁車，步行範圍內幾乎沒有對外店家。官方資訊顯示館內設有便利商店，訂房網站也有「步行5分鐘內有超商」的說法但未指名店家，建議入住後直接請櫃檯指引最近的選擇。",
+          places: [
+            {
+              id: "n1-1",
+              name: "飯店館內 コンビニ",
+              category: "convenience",
+              distanceLabel: "館內（免出飯店）",
+              hoursLabel: "營業時間依館方公告",
+              hoursType: "normal",
+              mapsQuery: "マロウドインターナショナルホテル成田",
+            },
+          ],
+        },
       },
       {
         id: "d1s5",
@@ -392,6 +411,11 @@ const DAYS = [
         intro: "",
         photoSpots: [],
         mustBuy: [],
+        nearby: {
+          remoteNotice:
+            "查證後發現行程表上的「HOTEL GREEN PLAZA 輕井澤」實際地址在群馬縣嬬恋村北輕井澤山區（鄰近輕井澤玩具王國），並不在輕井澤車站或銀座通周邊。住客評論提到最近的便利商店開車約5分鐘，步行範圍內沒有可靠資訊，建議晚上以飯店內的溫泉、賣店、餐廳為主，或請櫃檯協助叫車外出。",
+          places: [],
+        },
       },
     ],
   },
@@ -461,6 +485,20 @@ const DAYS = [
         intro: "今晚是全程唯一的溫泉飯店，建議晚餐後留時間泡湯放鬆。",
         photoSpots: [],
         mustBuy: [],
+        nearby: {
+          remoteNotice: null,
+          places: [
+            {
+              id: "n3-1",
+              name: "7-ELEVEN（山中湖エリア）",
+              category: "convenience",
+              distanceLabel: "約 10 分鐘（住客評論實測步行時間）",
+              hoursLabel: "24 小時營業",
+              hoursType: "24h",
+              mapsQuery: "セブンイレブン 山中湖",
+            },
+          ],
+        },
       },
     ],
   },
@@ -544,6 +582,47 @@ const DAYS = [
         intro: "",
         photoSpots: [],
         mustBuy: [],
+        nearby: {
+          remoteNotice: null,
+          places: [
+            {
+              id: "n4-1",
+              name: "7-ELEVEN 橫濱中華街東門店",
+              category: "convenience",
+              distanceLabel: "約 5 分鐘（含飯店到車站的路程估算）",
+              hoursLabel: "24 小時營業",
+              hoursType: "24h",
+              mapsQuery: "セブンイレブン 横浜中華街東門店",
+            },
+            {
+              id: "n4-2",
+              name: "全家便利商店 山下町店",
+              category: "convenience",
+              distanceLabel: "約 5 分鐘（含飯店到車站的路程估算）",
+              hoursLabel: "06:00-24:00",
+              hoursType: "normal",
+              mapsQuery: "ファミリーマート 山下町店 横浜",
+            },
+            {
+              id: "n4-3",
+              name: "Natural LAWSON 橫濱元町店",
+              category: "convenience",
+              distanceLabel: "約 6 分鐘（近山下公園）",
+              hoursLabel: "24 小時營業",
+              hoursType: "24h",
+              mapsQuery: "ナチュラルローソン 横浜元町店",
+            },
+            {
+              id: "n4-4",
+              name: "橫濱中華街",
+              category: "mall",
+              distanceLabel: "約 2 分鐘（飯店就在中華街朝陽門旁）",
+              hoursLabel: "多數店家營業至 21:00～22:00",
+              hoursType: "normal",
+              mapsQuery: "横浜中華街",
+            },
+          ],
+        },
       },
     ],
   },
@@ -599,9 +678,59 @@ const DAYS = [
         status: "upcoming",
         duration: "停留約 90 分鐘",
         intro:
-          "全高 634 公尺，是東京地標之一，晴天時展望台可遠眺富士山，塔下的 SOLAMACHI 商場也適合逛街。",
+          "全高 634 公尺，是東京地標之一，晴天時展望台可遠眺富士山，塔下的東京ソラマチ商場（300 多間店舖）也很適合逛街購物。",
         photoSpots: ["塔身仰角構圖", "展望台俯瞰東京市區"],
-        mustBuy: [{ name: "晴空塔限定周邊", note: "SOLAMACHI 商場內有多間官方紀念品店" }],
+        mustBuy: [{ name: "晴空塔限定周邊", note: "ソラマチ內有多間官方紀念品與角色商店" }],
+        nearby: {
+          remoteNotice: null,
+          places: [
+            {
+              id: "n5-solamachi-1",
+              name: "ソラマチ商店街（1F 東區）",
+              category: "mall",
+              distanceLabel: "館內 1 樓，逛街最方便的一層",
+              hoursLabel: "多數店家 10:00-21:00",
+              hoursType: "normal",
+              mapsQuery: "東京ソラマチ 1F ソラマチ商店街",
+            },
+            {
+              id: "n5-solamachi-2",
+              name: "ジャパンスーベニア／TVストアゾーン（4F 西區）",
+              category: "mall",
+              distanceLabel: "館內 4 樓，江戶老舖風格的伴手禮與角色周邊區",
+              hoursLabel: "10:00-21:00",
+              hoursType: "normal",
+              mapsQuery: "東京ソラマチ 4F ジャパンスーベニア",
+            },
+            {
+              id: "n5-solamachi-3",
+              name: "Disney Store（3F）",
+              category: "mall",
+              distanceLabel: "館內 3 樓",
+              hoursLabel: "10:00-21:00",
+              hoursType: "normal",
+              mapsQuery: "ディズニーストア 東京ソラマチ",
+            },
+            {
+              id: "n5-solamachi-4",
+              name: "フードマルシェ（2F，生鮮・伴手禮甜點）",
+              category: "mall",
+              distanceLabel: "館內 2 樓",
+              hoursLabel: "10:00-21:00",
+              hoursType: "normal",
+              mapsQuery: "東京ソラマチ フードマルシェ",
+            },
+            {
+              id: "n5-solamachi-5",
+              name: "STARBUCKS RESERVE（30F，眺望富士山）",
+              category: "izakaya",
+              distanceLabel: "館內 30 樓，需搭專用電梯",
+              hoursLabel: "10:00-23:00",
+              hoursType: "late",
+              mapsQuery: "スターバックス リザーブ 東京スカイツリータウン30F",
+            },
+          ],
+        },
       },
       {
         id: "d5s5",
@@ -614,6 +743,29 @@ const DAYS = [
         intro: "",
         photoSpots: [],
         mustBuy: [],
+        nearby: {
+          remoteNotice: null,
+          places: [
+            {
+              id: "n5-1",
+              name: "全家便利商店（飯店隔壁）",
+              category: "convenience",
+              distanceLabel: "約 1 分鐘（緊鄰飯店，多筆住客評論提及）",
+              hoursLabel: "多數市區店鋪為 24 小時，實際請以店家公告為準",
+              hoursType: "24h",
+              mapsQuery: "ファミリーマート 大森本町 東京",
+            },
+            {
+              id: "n5-2",
+              name: "JR大森駅前商店街",
+              category: "mall",
+              distanceLabel: "約 10 分鐘（飯店官網標示的步行時間）",
+              hoursLabel: "各店營業時間不一",
+              hoursType: "normal",
+              mapsQuery: "大森駅前 商店街",
+            },
+          ],
+        },
       },
     ],
   },
@@ -776,140 +928,9 @@ const SHOPPING_ITEMS = [
   },
 ];
 
-const NEARBY_FILTERS = [
-  { key: "convenience", label: "🏪 便利商店" },
-  { key: "mall", label: "🛍️ 商場／街區" },
-  { key: "izakaya", label: "🍜 宵夜/居酒屋" },
-  { key: "drugstore", label: "💊 藥妝店" },
-];
-
-// 以下資料已於 2026/07 逐一查證各飯店周邊的真實店家（來源：飯店官網、訂房網站住客評論、地圖服務）。
-// distanceMin 標示「約」是因為沒有 Google Maps 距離矩陣 API 可用，是依查到的車站/飯店步行時間資訊換算的估計值，
-// 正式使用前建議直接用 Google Maps 走一次路線確認。mapsQuery 皆為可在 Google 地圖中搜尋到的真實店名。
-const NEARBY_BY_DAY = {
-  1: {
-    remoteNotice:
-      "成田MARROAD飯店位在成田機場周邊，僅提供機場↔飯店免費接駁車，步行範圍內幾乎沒有對外店家。官方資訊顯示館內設有便利商店，訂房網站也有「步行5分鐘內有超商」的說法但未指名店家，建議入住後直接請櫃檯指引最近的選擇。",
-    places: [
-      {
-        id: "n1-1",
-        name: "飯店館內 コンビニ",
-        category: "convenience",
-        distanceMin: 0,
-        distanceLabel: "館內（免出飯店）",
-        hoursLabel: "營業時間依館方公告",
-        hoursType: "normal",
-        mapsQuery: "マロウドインターナショナルホテル成田",
-      },
-    ],
-  },
-  2: {
-    remoteNotice:
-      "查證後發現行程表上的「HOTEL GREEN PLAZA 輕井澤」實際地址在群馬縣嬬恋村北輕井澤山區（鄰近輕井澤玩具王國），並不在輕井澤車站或銀座通周邊。住客評論提到最近的便利商店開車約5分鐘，步行範圍內沒有可靠資訊，建議晚上以飯店內的溫泉、賣店、餐廳為主，或請櫃檯協助叫車外出。",
-    places: [],
-  },
-  3: {
-    remoteNotice: null,
-    places: [
-      {
-        id: "n3-1",
-        name: "7-ELEVEN（山中湖エリア）",
-        category: "convenience",
-        distanceMin: 10,
-        distanceLabel: "約 10 分鐘（住客評論實測步行時間）",
-        hoursLabel: "24 小時營業",
-        hoursType: "24h",
-        mapsQuery: "セブンイレブン 山中湖",
-      },
-    ],
-  },
-  4: {
-    remoteNotice: null,
-    places: [
-      {
-        id: "n4-1",
-        name: "7-ELEVEN 橫濱中華街東門店",
-        category: "convenience",
-        distanceMin: 5,
-        distanceLabel: "約 5 分鐘（含飯店到車站的路程估算）",
-        hoursLabel: "24 小時營業",
-        hoursType: "24h",
-        mapsQuery: "セブンイレブン 横浜中華街東門店",
-      },
-      {
-        id: "n4-2",
-        name: "全家便利商店 山下町店",
-        category: "convenience",
-        distanceMin: 5,
-        distanceLabel: "約 5 分鐘（含飯店到車站的路程估算）",
-        hoursLabel: "06:00-24:00",
-        hoursType: "normal",
-        mapsQuery: "ファミリーマート 山下町店 横浜",
-      },
-      {
-        id: "n4-3",
-        name: "Natural LAWSON 橫濱元町店",
-        category: "convenience",
-        distanceMin: 6,
-        distanceLabel: "約 6 分鐘（近山下公園）",
-        hoursLabel: "24 小時營業",
-        hoursType: "24h",
-        mapsQuery: "ナチュラルローソン 横浜元町店",
-      },
-      {
-        id: "n4-4",
-        name: "橫濱中華街",
-        category: "mall",
-        distanceMin: 2,
-        distanceLabel: "約 2 分鐘（飯店就在中華街朝陽門旁）",
-        hoursLabel: "多數店家營業至 21:00～22:00",
-        hoursType: "normal",
-        mapsQuery: "横浜中華街",
-      },
-    ],
-  },
-  5: {
-    remoteNotice: null,
-    places: [
-      {
-        id: "n5-1",
-        name: "全家便利商店（飯店隔壁）",
-        category: "convenience",
-        distanceMin: 1,
-        distanceLabel: "約 1 分鐘（緊鄰飯店，多筆住客評論提及）",
-        hoursLabel: "多數市區店鋪為 24 小時，實際請以店家公告為準",
-        hoursType: "24h",
-        mapsQuery: "ファミリーマート 大森本町 東京",
-      },
-      {
-        id: "n5-2",
-        name: "JR大森駅前商店街",
-        category: "mall",
-        distanceMin: 10,
-        distanceLabel: "約 10 分鐘（飯店官網標示的步行時間）",
-        hoursLabel: "各店營業時間不一",
-        hoursType: "normal",
-        mapsQuery: "大森駅前 商店街",
-      },
-    ],
-  },
-  6: {
-    remoteNotice:
-      "今天上午退房地點與 Day5 相同（東京大森緹馬克城市飯店），下方沿用同一批已查證地點，下午會前往成田機場。",
-    places: [
-      {
-        id: "n6-1",
-        name: "全家便利商店（飯店隔壁）",
-        category: "convenience",
-        distanceMin: 1,
-        distanceLabel: "約 1 分鐘（緊鄰飯店，多筆住客評論提及）",
-        hoursLabel: "多數市區店鋪為 24 小時，實際請以店家公告為準",
-        hoursType: "24h",
-        mapsQuery: "ファミリーマート 大森本町 東京",
-      },
-    ],
-  },
-};
+// 以下真實查證過的周邊資料（來源：飯店官網、訂房網站住客評論、地圖服務，2026/07 查證）
+// 直接掛在對應的行程站點（stop.nearby）上，點開該站才會顯示，不再是獨立分頁。
+// distanceLabel 標示「約」是因為沒有 Google Maps 距離矩陣 API，是依查到的步行時間資訊換算的估計值。
 
 /* ======================================================================
    THEME TOKENS（不使用 Tailwind 任意值，顏色一律透過 inline style 套用）
@@ -969,6 +990,90 @@ const NEARBY_ICON = {
   izakaya: Beer,
   drugstore: Pill,
 };
+
+/* ======================================================================
+   購物清單批次貼上：文字解析工具
+   ----------------------------------------------------------------------
+   這是關鍵字比對的簡易規則，不是 AI 語意理解，遇到很口語、很不規則的句子
+   （例如夾雜心情敘述的長句）還是可能猜錯分類或漏抓數量/價格，
+   所以貼上後一定會先出現「預覽」讓你檢查、調整過再真的加入清單。
+   ====================================================================== */
+
+const CATEGORY_KEYWORDS = {
+  藥妝: ["藥", "眼藥", "面膜", "化妝水", "乳液", "防曬", "感冒藥", "胃藥", "OK繃", "痠痛貼布", "精華", "乳霜", "牙膏", "隱形眼鏡", "美白", "肌肉貼"],
+  服飾: ["衣", "外套", "鞋", "襪", "帽", "包", "羽絨", "T恤", "褲", "裙", "圍巾", "手套", "內衣"],
+  零食: ["餅", "巧克力", "糖", "餅乾", "洋芋片", "軟糖", "泡麵", "茶", "咖啡", "果凍", "布丁", "零食", "牛奶糖", "仙貝"],
+  伴手禮: ["御守", "吊飾", "鑰匙圈", "杯", "碗", "風鈴", "文具", "筆記本", "磁鐵", "紀念", "周邊", "娃娃"],
+};
+
+function guessCategory(name) {
+  for (const [cat, words] of Object.entries(CATEGORY_KEYWORDS)) {
+    if (words.some((w) => name.includes(w))) return cat;
+  }
+  return "伴手禮";
+}
+
+function toHalfWidthDigits(str) {
+  return str.replace(/[\uFF10-\uFF19]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0));
+}
+
+// 將一整段貼上的文字解析成商品陣列。每一行嘗試抓出：品名 / 數量 / 價格 / 分類。
+// 規則涵蓋常見寫法，抓不到的欄位就留預設值（數量1、價格空白），不會硬猜造假資料。
+function parseBulkShoppingText(text) {
+  const lines = text.split(/\r?\n/);
+  const results = [];
+  let currentCategory = null;
+
+  for (let raw of lines) {
+    let line = toHalfWidthDigits(raw).replace(/[\u3000\t]+/g, " ").trim();
+    if (!line) continue;
+
+    // 去掉常見項目符號／編號前綴，例如 "・" "-" "1. " "(1)" "1、"
+    line = line.replace(/^[-*・‧•→>]+\s*/, "");
+    line = line.replace(/^\(?\d+[.)、]\s*/, "");
+    line = line.trim();
+    if (!line) continue;
+
+    // 分類標題行，例如「藥妝：」「零食:」單獨一行 → 之後的品項都套用這個分類
+    const headerMatch = line.match(/^([\u4e00-\u9fa5]{1,6})[:：]$/);
+    if (headerMatch && SHOPPING_CATEGORIES.includes(headerMatch[1])) {
+      currentCategory = headerMatch[1];
+      continue;
+    }
+
+    // 價格：¥1,200 / NT$500 / $500 / 1200円 / 1200元
+    let price = "";
+    const priceMatch = line.match(/(¥|NT\$|\$)\s?[\d,]+|[\d,]+\s?(円|圓|元)/);
+    if (priceMatch) {
+      price = priceMatch[0].replace(/\s/g, "");
+      line = line.replace(priceMatch[0], "").trim();
+    }
+
+    // 數量：x2 X2 *2 ×2 2個 2入 2瓶 2件 2條 2支 2包 2盒 2罐 2組 2片
+    let qty = 1;
+    const qtyMatch = line.match(/[xX×*]\s?(\d+)|(\d+)\s?(個|入|瓶|件|條|支|包|盒|罐|組|片)/);
+    if (qtyMatch) {
+      qty = parseInt(qtyMatch[1] || qtyMatch[2], 10) || 1;
+      line = line.replace(qtyMatch[0], "").trim();
+    }
+
+    // 清掉殘留在頭尾的標點符號
+    line = line.replace(/^[\s,，\-–—]+|[\s,，\-–—]+$/g, "").trim();
+    if (!line) continue;
+
+    results.push({
+      tempId: `parsed-${results.length}-${Date.now()}`,
+      name: line,
+      category: currentCategory || guessCategory(line),
+      price,
+      qty,
+      foundAt: [],
+      note: "",
+      included: true,
+    });
+  }
+  return results;
+}
 
 /* ======================================================================
    小元件
@@ -1075,6 +1180,58 @@ function CountdownTicket({ theme, targetTime }) {
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+function NearbyPlaceRow({ theme, place }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const Icon = NEARBY_ICON[place.category] || Store;
+  const hs =
+    place.hoursType === "24h"
+      ? { color: theme.green, bg: theme.greenSoft }
+      : place.hoursType === "late"
+      ? { color: theme.orange, bg: theme.orangeSoft }
+      : { color: theme.textSecondary, bg: theme.bgCard };
+  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.mapsQuery)}`;
+
+  return (
+    <div className="rounded-xl overflow-hidden" style={{ backgroundColor: theme.bgSunken, border: `1px solid ${theme.border}` }}>
+      <button className="w-full text-left px-3 py-2.5 flex items-center gap-2.5" onClick={() => setIsOpen((v) => !v)}>
+        <div className="flex items-center justify-center rounded-lg flex-shrink-0" style={{ width: 32, height: 32, backgroundColor: theme.bgCard }}>
+          <Icon size={15} color={theme.indigo} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-semibold truncate" style={{ color: theme.textPrimary, fontFamily: "'Noto Sans TC', sans-serif" }}>
+            {place.name}
+          </p>
+          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+            <span className="text-xs" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+              {place.distanceLabel}
+            </span>
+            <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ backgroundColor: hs.bg, color: hs.color, fontFamily: "'Noto Sans TC', sans-serif", fontWeight: 700 }}>
+              {place.hoursLabel}
+            </span>
+          </div>
+        </div>
+        <ChevronDown size={14} color={theme.textSecondary} style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s ease", flexShrink: 0 }} />
+      </button>
+      {isOpen && (
+        <div className="px-3 pb-2.5">
+          <a
+            href={mapsUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="w-full flex items-center justify-center gap-1.5 rounded-lg py-2"
+            style={{ backgroundColor: theme.indigo, textDecoration: "none" }}
+          >
+            <Navigation2 size={13} color="#fff" />
+            <span className="text-xs font-bold" style={{ color: "#fff", fontFamily: "'Noto Sans TC', sans-serif" }}>
+              導航至 Google Maps
+            </span>
+          </a>
+        </div>
+      )}
     </div>
   );
 }
@@ -1401,6 +1558,44 @@ function TimelineStop({
               </div>
             )}
 
+            {stop.nearby && (
+              <div className="mt-4">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <Store size={15} color={theme.green} />
+                  <span
+                    className="text-sm font-bold"
+                    style={{ color: theme.textPrimary, fontFamily: "'Noto Sans TC', sans-serif" }}
+                  >
+                    附近好買・好逛
+                  </span>
+                </div>
+
+                {stop.nearby.remoteNotice && (
+                  <div
+                    className="flex items-start gap-2 rounded-xl px-3 py-2.5 mb-2"
+                    style={{ backgroundColor: theme.orangeSoft, border: `1px solid ${theme.orange}` }}
+                  >
+                    <AlertTriangle size={14} color={theme.orange} className="flex-shrink-0 mt-0.5" />
+                    <p className="text-xs leading-relaxed" style={{ color: theme.textPrimary, fontFamily: "'Noto Sans TC', sans-serif" }}>
+                      {stop.nearby.remoteNotice}
+                    </p>
+                  </div>
+                )}
+
+                {stop.nearby.places.length === 0 && !stop.nearby.remoteNotice && (
+                  <p className="text-xs" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+                    這站附近沒有查到需要特別介紹的店家
+                  </p>
+                )}
+
+                <div className="flex flex-col gap-2">
+                  {stop.nearby.places.map((place) => (
+                    <NearbyPlaceRow key={place.id} theme={theme} place={place} />
+                  ))}
+                </div>
+              </div>
+            )}
+
             {isCurrent && stop.gatherAt && (
               <CountdownTicket theme={theme} targetTime={new Date(stop.gatherAt)} />
             )}
@@ -1522,42 +1717,6 @@ function DaySwitcher({ theme, days, dayIndex, setDayIndex }) {
   );
 }
 
-function LocationTracker({ theme, enabled, onToggle, geo, matchedStopName }) {
-  const statusText = () => {
-    if (!enabled) return "點擊開啟，靠近哪個景點就自動標示為目前行程";
-    if (geo.status === "locating") return "定位中…";
-    if (geo.status === "unsupported") return "此環境不支援定位（例如預覽視窗），請在手機瀏覽器開啟";
-    if (geo.status === "error") return `定位失敗：${geo.error || "請確認已允許定位權限"}`;
-    if (geo.status === "ok" && matchedStopName) return `📍 偵測到你在「${matchedStopName}」附近`;
-    if (geo.status === "ok") return "已定位，但目前不在任何景點 400 公尺內";
-    return "";
-  };
-
-  return (
-    <div
-      className="flex items-center gap-3 rounded-2xl px-4 py-3 mb-3"
-      style={{ backgroundColor: theme.bgSunken, border: `1px solid ${theme.border}` }}
-    >
-      <button
-        onClick={onToggle}
-        className="flex items-center justify-center rounded-full flex-shrink-0"
-        style={{ width: 36, height: 36, backgroundColor: enabled ? theme.indigo : theme.bgCard, border: `1px solid ${enabled ? theme.indigo : theme.border}` }}
-        aria-label="切換定位偵測"
-      >
-        <LocateFixed size={17} color={enabled ? "#fff" : theme.textSecondary} />
-      </button>
-      <div className="flex-1 min-w-0">
-        <p className="text-xs font-bold" style={{ color: theme.textPrimary, fontFamily: "'Noto Sans TC', sans-serif" }}>
-          依目前位置自動偵測行程
-        </p>
-        <p className="text-xs mt-0.5" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
-          {statusText()}
-        </p>
-      </div>
-    </div>
-  );
-}
-
 function ItineraryTab({
   theme,
   day,
@@ -1568,6 +1727,7 @@ function ItineraryTab({
   updateDayStops,
   notes,
   setNotes,
+  autoCurrentId,
 }) {
   const stops = day.stops;
   const [expandedId, setExpandedId] = useState(
@@ -1575,24 +1735,6 @@ function ItineraryTab({
   );
   const [editingId, setEditingId] = useState(null);
   const [editValue, setEditValue] = useState("");
-  const [locationEnabled, setLocationEnabled] = useLocalStorage("locationEnabled", false);
-  const geo = useGeolocation(locationEnabled);
-
-  // 依目前位置比對這一天所有有座標的站點，找出最近且在範圍內的一個
-  const autoCurrentId = useMemo(() => {
-    if (geo.status !== "ok") return null;
-    let bestId = null;
-    let bestDist = Infinity;
-    stops.forEach((s) => {
-      if (!s.coords) return;
-      const d = distanceMeters(geo.lat, geo.lng, s.coords.lat, s.coords.lng);
-      if (d < bestDist) {
-        bestDist = d;
-        bestId = s.id;
-      }
-    });
-    return bestDist <= AUTO_MATCH_RADIUS_M ? bestId : null;
-  }, [geo.status, geo.lat, geo.lng, stops]);
 
   // 偵測到附近景點時，自動展開該站
   useEffect(() => {
@@ -1636,8 +1778,6 @@ function ItineraryTab({
     updateDayStops(dayIndex, newStops);
   };
 
-  const matchedStop = stops.find((s) => s.id === autoCurrentId);
-
   return (
     <div className="pt-4 pb-6">
       <div className="px-4">
@@ -1653,14 +1793,6 @@ function ItineraryTab({
 
       <div className="px-4">
         <WeatherCard theme={theme} weather={day.weather} />
-
-        <LocationTracker
-          theme={theme}
-          enabled={locationEnabled}
-          onToggle={() => setLocationEnabled((v) => !v)}
-          geo={geo}
-          matchedStopName={matchedStop ? matchedStop.name : null}
-        />
 
         <p
           className="text-xs mb-3 flex items-center gap-1"
@@ -1876,6 +2008,234 @@ function ItemFormModal({ theme, isOpen, onClose, onSubmit, editingItem }) {
   );
 }
 
+function BulkPasteModal({ theme, isOpen, onClose, onConfirm }) {
+  const [stage, setStage] = useState("input"); // 'input' | 'preview'
+  const [rawText, setRawText] = useState("");
+  const [parsed, setParsed] = useState([]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setStage("input");
+      setRawText("");
+      setParsed([]);
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const runParse = () => {
+    const result = parseBulkShoppingText(rawText);
+    setParsed(result);
+    setStage("preview");
+  };
+
+  const updateParsed = (tempId, patch) => {
+    setParsed((prev) => prev.map((p) => (p.tempId === tempId ? { ...p, ...patch } : p)));
+  };
+
+  const toggleAll = (value) => {
+    setParsed((prev) => prev.map((p) => ({ ...p, included: value })));
+  };
+
+  const includedCount = parsed.filter((p) => p.included).length;
+
+  const handleConfirm = () => {
+    const toAdd = parsed
+      .filter((p) => p.included && p.name.trim())
+      .map((p) => ({
+        id: `p${Date.now()}${Math.random().toString(36).slice(2, 6)}`,
+        name: p.name.trim(),
+        category: p.category,
+        price: p.price.trim() || "¥—",
+        qty: Number(p.qty) || 1,
+        foundAt: [],
+        note: "",
+        checked: false,
+      }));
+    onConfirm(toAdd);
+  };
+
+  const fieldStyle = {
+    backgroundColor: theme.bgSunken,
+    color: theme.textPrimary,
+    border: `1px solid ${theme.border}`,
+    fontFamily: "'Noto Sans TC', sans-serif",
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-40 flex items-end justify-center"
+      style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full flex flex-col"
+        style={{
+          maxWidth: 430,
+          maxHeight: "85vh",
+          backgroundColor: theme.bgPage,
+          borderTopLeftRadius: 24,
+          borderTopRightRadius: 24,
+          overflow: "hidden",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-4 py-4" style={{ borderBottom: `1px solid ${theme.border}` }}>
+          <div className="flex items-center gap-2">
+            <ClipboardList size={20} color={theme.indigo} />
+            <h2 className="text-base font-bold" style={{ color: theme.textPrimary, fontFamily: "'Noto Serif TC', serif" }}>
+              {stage === "input" ? "貼上清單" : `預覽（${includedCount} 項將加入）`}
+            </h2>
+          </div>
+          <button onClick={onClose} className="flex items-center justify-center rounded-full" style={{ width: 30, height: 30, backgroundColor: theme.bgSunken }}>
+            <X size={15} color={theme.textSecondary} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-4 py-4">
+          {stage === "input" ? (
+            <>
+              <p className="text-xs mb-3" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+                把整段文字貼進來，例如從社群貼文複製的清單。一行算一個商品，抓得到就自動填數量、價格、分類，抓不到的欄位會留空或預設數量 1，貼上後可以再檢查調整。
+              </p>
+              <textarea
+                value={rawText}
+                onChange={(e) => setRawText(e.target.value)}
+                autoFocus
+                placeholder={"例如：\n藥妝：\n・SHISEIDO化妝水 ¥2480\n・EVE止痛藥 x2\n零食\n白色戀人*2 1080円\nRoyce生巧克力"}
+                rows={10}
+                className="w-full rounded-xl px-3 py-2 text-sm outline-none resize-none"
+                style={fieldStyle}
+              />
+              <button
+                onClick={runParse}
+                disabled={!rawText.trim()}
+                className="w-full flex items-center justify-center gap-2 rounded-xl py-3 mt-3"
+                style={{
+                  backgroundColor: rawText.trim() ? theme.indigo : theme.bgSunken,
+                  color: rawText.trim() ? "#fff" : theme.textFaint,
+                }}
+              >
+                <Wand2 size={16} />
+                <span className="text-sm font-bold" style={{ fontFamily: "'Noto Sans TC', sans-serif" }}>
+                  解析清單
+                </span>
+              </button>
+            </>
+          ) : (
+            <>
+              {parsed.length === 0 ? (
+                <div className="rounded-2xl px-4 py-8 flex flex-col items-center gap-2" style={{ backgroundColor: theme.bgCard, border: `1px solid ${theme.border}` }}>
+                  <ClipboardList size={28} color={theme.textFaint} />
+                  <p className="text-sm text-center" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+                    沒有解析出任何項目，返回修改貼上的文字看看
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between mb-2">
+                    <button onClick={() => toggleAll(true)} className="text-xs" style={{ color: theme.indigo, fontFamily: "'Noto Sans TC', sans-serif" }}>
+                      全選
+                    </button>
+                    <button onClick={() => toggleAll(false)} className="text-xs" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+                      取消全選
+                    </button>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    {parsed.map((p) => (
+                      <div
+                        key={p.tempId}
+                        className="rounded-xl px-3 py-2.5"
+                        style={{ backgroundColor: theme.bgCard, border: `1px solid ${theme.border}`, opacity: p.included ? 1 : 0.5 }}
+                      >
+                        <div className="flex items-center gap-2 mb-2">
+                          <button
+                            onClick={() => updateParsed(p.tempId, { included: !p.included })}
+                            className="flex items-center justify-center rounded-md flex-shrink-0"
+                            style={{
+                              width: 22,
+                              height: 22,
+                              backgroundColor: p.included ? theme.green : "transparent",
+                              border: `2px solid ${p.included ? theme.green : theme.border}`,
+                            }}
+                          >
+                            {p.included && <Check size={13} color="#fff" strokeWidth={3} />}
+                          </button>
+                          <input
+                            value={p.name}
+                            onChange={(e) => updateParsed(p.tempId, { name: e.target.value })}
+                            className="flex-1 min-w-0 rounded-lg px-2 py-1 text-sm outline-none"
+                            style={fieldStyle}
+                          />
+                        </div>
+                        <div className="flex gap-1.5 flex-wrap mb-2">
+                          {SHOPPING_CATEGORIES.filter((c) => c !== "全部").map((cat) => (
+                            <button
+                              key={cat}
+                              onClick={() => updateParsed(p.tempId, { category: cat })}
+                              className="px-2 py-0.5 rounded-full text-xs"
+                              style={{
+                                backgroundColor: p.category === cat ? theme.indigo : theme.bgSunken,
+                                color: p.category === cat ? "#fff" : theme.textSecondary,
+                                fontFamily: "'Noto Sans TC', sans-serif",
+                              }}
+                            >
+                              {cat}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="flex gap-2">
+                          <input
+                            value={p.price}
+                            onChange={(e) => updateParsed(p.tempId, { price: e.target.value })}
+                            placeholder="價格未標示"
+                            className="flex-1 min-w-0 rounded-lg px-2 py-1 text-xs outline-none"
+                            style={{ ...fieldStyle, fontFamily: "'JetBrains Mono', monospace" }}
+                          />
+                          <input
+                            type="number"
+                            min={1}
+                            value={p.qty}
+                            onChange={(e) => updateParsed(p.tempId, { qty: e.target.value })}
+                            className="rounded-lg px-2 py-1 text-xs outline-none"
+                            style={{ ...fieldStyle, width: 60, fontFamily: "'JetBrains Mono', monospace" }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              <div className="flex gap-2 mt-4">
+                <button
+                  onClick={() => setStage("input")}
+                  className="flex-1 rounded-xl py-3 text-sm font-bold"
+                  style={{ backgroundColor: theme.bgSunken, color: theme.textSecondary, fontFamily: "'Noto Sans TC', sans-serif" }}
+                >
+                  返回修改
+                </button>
+                <button
+                  onClick={handleConfirm}
+                  disabled={includedCount === 0}
+                  className="flex-1 rounded-xl py-3 text-sm font-bold"
+                  style={{
+                    backgroundColor: includedCount > 0 ? theme.indigo : theme.bgSunken,
+                    color: includedCount > 0 ? "#fff" : theme.textFaint,
+                    fontFamily: "'Noto Sans TC', sans-serif",
+                  }}
+                >
+                  加入清單（{includedCount}）
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ShoppingItemCard({ theme, item, isEditing, onToggleEdit, onCommit, onToggleChecked, isConfirmingDelete, onRequestDelete, onCancelDelete, onDelete }) {
   const [draft, setDraft] = useState(null);
 
@@ -1930,7 +2290,7 @@ function ShoppingItemCard({ theme, item, isEditing, onToggleEdit, onCommit, onTo
             value={draft.name}
             onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
             autoFocus
-            className="flex-1 rounded-lg px-2.5 py-1.5 text-sm font-semibold outline-none"
+            className="flex-1 min-w-0 rounded-lg px-2.5 py-1.5 text-sm font-semibold outline-none"
             style={fieldStyle}
           />
           <button
@@ -1967,7 +2327,7 @@ function ShoppingItemCard({ theme, item, isEditing, onToggleEdit, onCommit, onTo
             value={draft.price}
             onChange={(e) => setDraft((d) => ({ ...d, price: e.target.value }))}
             placeholder="¥1,000"
-            className="flex-1 rounded-lg px-2.5 py-1.5 text-xs outline-none"
+            className="flex-1 min-w-0 rounded-lg px-2.5 py-1.5 text-xs outline-none"
             style={{ ...fieldStyle, fontFamily: "'JetBrains Mono', monospace" }}
           />
           <input
@@ -2128,6 +2488,7 @@ function ShoppingItemCard({ theme, item, isEditing, onToggleEdit, onCommit, onTo
 function ShoppingTab({ theme, items, setItems }) {
   const [activeCategory, setActiveCategory] = useState("全部");
   const [formOpen, setFormOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [editingCardId, setEditingCardId] = useState(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
@@ -2141,6 +2502,16 @@ function ShoppingTab({ theme, items, setItems }) {
     return [...filtered].sort((a, b) => Number(a.checked) - Number(b.checked));
   }, [items, activeCategory]);
 
+  const totalEstimate = useMemo(() => {
+    return items.reduce((sum, it) => {
+      const digits = (it.price || "").replace(/[^\d]/g, "");
+      if (!digits) return sum;
+      return sum + parseInt(digits, 10) * (Number(it.qty) || 1);
+    }, 0);
+  }, [items]);
+
+  const priceSetCount = items.filter((it) => /\d/.test(it.price || "")).length;
+
   const commitEdit = (id, data) => {
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...data } : it)));
     setEditingCardId(null);
@@ -2149,6 +2520,11 @@ function ShoppingTab({ theme, items, setItems }) {
   const handleAddSubmit = (data) => {
     setItems((prev) => [...prev, { id: `p${Date.now()}`, checked: false, note: "", ...data }]);
     setFormOpen(false);
+  };
+
+  const handleBulkConfirm = (newItems) => {
+    setItems((prev) => [...prev, ...newItems]);
+    setBulkOpen(false);
   };
 
   const deleteItem = (id) => {
@@ -2171,26 +2547,49 @@ function ShoppingTab({ theme, items, setItems }) {
         點項目即可編輯名稱、分類、價格、備註與「在附近尋找」的店家；清單只存在你自己的裝置
       </p>
 
-      <div className="flex gap-2 px-4 pb-3 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-        {SHOPPING_CATEGORIES.map((cat) => {
-          const active = activeCategory === cat;
-          return (
-            <button
-              key={cat}
-              onClick={() => setActiveCategory(cat)}
-              className="px-4 py-1.5 rounded-full text-sm whitespace-nowrap flex-shrink-0 transition-colors"
-              style={{
-                backgroundColor: active ? theme.indigo : theme.bgCard,
-                color: active ? "#fff" : theme.textSecondary,
-                border: `1px solid ${active ? theme.indigo : theme.border}`,
-                fontFamily: "'Noto Sans TC', sans-serif",
-                fontWeight: active ? 700 : 500,
-              }}
-            >
-              {cat}
-            </button>
-          );
-        })}
+      {priceSetCount > 0 && (
+        <div className="mx-4 mb-3 flex items-center justify-between rounded-xl px-4 py-2.5" style={{ backgroundColor: theme.bgSunken, border: `1px solid ${theme.border}` }}>
+          <span className="text-xs" style={{ color: theme.textSecondary, fontFamily: "'Noto Sans TC', sans-serif" }}>
+            已標價項目估算總額（{priceSetCount} 項）
+          </span>
+          <span className="text-sm font-bold" style={{ color: theme.indigo, fontFamily: "'JetBrains Mono', monospace" }}>
+            ¥{totalEstimate.toLocaleString()}
+          </span>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between px-4 pb-3 gap-2">
+        <div className="flex gap-2 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+          {SHOPPING_CATEGORIES.map((cat) => {
+            const active = activeCategory === cat;
+            return (
+              <button
+                key={cat}
+                onClick={() => setActiveCategory(cat)}
+                className="px-4 py-1.5 rounded-full text-sm whitespace-nowrap flex-shrink-0 transition-colors"
+                style={{
+                  backgroundColor: active ? theme.indigo : theme.bgCard,
+                  color: active ? "#fff" : theme.textSecondary,
+                  border: `1px solid ${active ? theme.indigo : theme.border}`,
+                  fontFamily: "'Noto Sans TC', sans-serif",
+                  fontWeight: active ? 700 : 500,
+                }}
+              >
+                {cat}
+              </button>
+            );
+          })}
+        </div>
+        <button
+          onClick={() => setBulkOpen(true)}
+          className="flex items-center gap-1 px-3 py-1.5 rounded-full flex-shrink-0"
+          style={{ backgroundColor: theme.bgCard, border: `1px solid ${theme.border}` }}
+        >
+          <ClipboardList size={13} color={theme.indigo} />
+          <span className="text-xs font-bold" style={{ color: theme.indigo, fontFamily: "'Noto Sans TC', sans-serif" }}>
+            貼上清單
+          </span>
+        </button>
       </div>
 
       <div className="px-4 flex flex-col gap-3">
@@ -2245,193 +2644,218 @@ function ShoppingTab({ theme, items, setItems }) {
         onSubmit={handleAddSubmit}
         editingItem={null}
       />
+
+      <BulkPasteModal
+        theme={theme}
+        isOpen={bulkOpen}
+        onClose={() => setBulkOpen(false)}
+        onConfirm={handleBulkConfirm}
+      />
     </div>
   );
 }
 
-function NearbyTab({ theme, day, days, dayIndex, setDayIndex }) {
-  const [activeFilters, setActiveFilters] = useState(new Set());
-  const [expandedId, setExpandedId] = useState(null);
 
-  const dayData = NEARBY_BY_DAY[day.id] || { remoteNotice: null, places: [] };
+function ChatTab({ theme, days, shoppingItems, isAdmin }) {
+  const [messages, setMessages] = useLocalStorage("chatHistory", []);
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState(null);
+  const scrollRef = useRef(null);
 
-  const toggleFilter = (key) => {
-    setActiveFilters((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages, isLoading]);
+
+  const quickPrompts = ["今天行程有什麼？", "附近哪裡買藥妝？", "廁所日文怎麼說？", "退稅要注意什麼？"];
+
+  const buildTripContext = () => ({
+    tripName: TRIP_META.tripName,
+    leader: { name: TRIP_META.leaderName, phoneTW: TRIP_META.leaderPhoneTW, phoneJP: TRIP_META.leaderPhoneJP },
+    days: days.map((d) => ({
+      dayLabel: d.dayLabel,
+      dateLabel: d.dateLabel,
+      cityLabel: d.cityLabel,
+      hotel: d.hotel,
+      weather: d.weather,
+      stops: d.stops.map((s) => ({
+        time: s.time,
+        name: s.name,
+        nameJp: s.nameJp,
+        duration: s.duration,
+        intro: s.intro,
+        photoSpots: s.photoSpots,
+        mustBuy: s.mustBuy,
+        nearby: s.nearby,
+        flight: s.flight,
+      })),
+    })),
+    shoppingList: shoppingItems.map((it) => ({
+      name: it.name,
+      category: it.category,
+      price: it.price,
+      qty: it.qty,
+      checked: it.checked,
+      note: it.note,
+    })),
+    emergencyInfo: EMERGENCY_INFO,
+  });
+
+  const sendMessage = async (text) => {
+    const trimmed = text.trim();
+    if (!trimmed || isLoading) return;
+
+    const userMsg = { role: "user", text: trimmed };
+    const nextMessages = [...messages, userMsg];
+    setMessages(nextMessages);
+    setInput("");
+    setIsLoading(true);
+    setErrorMsg(null);
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: trimmed,
+          history: messages,
+          tripContext: buildTripContext(),
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setErrorMsg(data.error || "發生未知錯誤");
+        setIsLoading(false);
+        return;
+      }
+
+      setMessages([...nextMessages, { role: "assistant", text: data.reply }]);
+    } catch (err) {
+      setErrorMsg("連不上聊天服務。這個功能需要部署到 Vercel 並設定好 GEMINI_API_KEY 才能運作，預覽視窗或純本機 npm run dev 環境會連不上是正常的。");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const displayed =
-    activeFilters.size === 0
-      ? dayData.places
-      : dayData.places.filter((p) => activeFilters.has(p.category));
-
-  const hoursStyle = (type) => {
-    if (type === "24h") return { color: theme.green, bg: theme.greenSoft, label: "24H" };
-    if (type === "late") return { color: theme.orange, bg: theme.orangeSoft, label: "夜間" };
-    return { color: theme.textSecondary, bg: theme.bgSunken, label: "營業中" };
+  const clearHistory = () => {
+    setMessages([]);
+    setErrorMsg(null);
   };
 
   return (
-    <div className="pt-4 pb-6">
-      <div className="px-4">
+    <div className="flex flex-col" style={{ height: "calc(100vh - 64px)" }}>
+      <div className="px-4 pt-4 pb-2 flex items-center justify-between">
         <h2
-          className="text-lg mb-1"
+          className="text-lg flex items-center gap-2"
           style={{ color: theme.textPrimary, fontFamily: "'Noto Serif TC', serif", fontWeight: 700 }}
         >
-          周邊探索
+          <Sparkles size={18} color={theme.indigo} />
+          旅遊小幫手
         </h2>
-        <p className="text-xs mb-3" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
-          依當晚住宿地點顯示，距離與店名已逐一查證，出發前仍建議實際用 Google 地圖走一次路線
-        </p>
+        {messages.length > 0 && (
+          <button onClick={clearHistory} className="text-xs" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+            清除對話
+          </button>
+        )}
       </div>
+      <p className="px-4 pb-3 text-xs" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+        只回答這趟行程、購物、日語、日本旅遊相關的問題，其他話題會婉拒
+      </p>
 
-      <DaySwitcher theme={theme} days={days} dayIndex={dayIndex} setDayIndex={setDayIndex} />
-
-      <div className="px-4">
-        {dayData.remoteNotice && (
-          <div
-            className="flex items-start gap-2 rounded-xl px-3 py-3 mb-4"
-            style={{ backgroundColor: theme.orangeSoft, border: `1px solid ${theme.orange}` }}
-          >
-            <AlertTriangle size={16} color={theme.orange} className="flex-shrink-0 mt-0.5" />
-            <p className="text-xs leading-relaxed" style={{ color: theme.textPrimary, fontFamily: "'Noto Sans TC', sans-serif" }}>
-              {dayData.remoteNotice}
-            </p>
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 flex flex-col gap-3">
+        {messages.length === 0 && (
+          <div className="flex flex-col gap-2 mt-2">
+            <div
+              className="rounded-2xl px-4 py-3 flex items-start gap-2"
+              style={{ backgroundColor: theme.bgCard, border: `1px solid ${theme.border}` }}
+            >
+              <Bot size={16} color={theme.indigo} className="flex-shrink-0 mt-0.5" />
+              <p className="text-sm" style={{ color: theme.textSecondary, fontFamily: "'Noto Sans TC', sans-serif" }}>
+                你好，我知道這趟行程、購物清單、附近商家跟緊急聯絡資訊，也能聊日本旅遊實用日語跟購物常識。想問什麼？
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2 mt-1">
+              {quickPrompts.map((q) => (
+                <button
+                  key={q}
+                  onClick={() => sendMessage(q)}
+                  className="text-xs px-3 py-1.5 rounded-full"
+                  style={{ backgroundColor: theme.bgSunken, color: theme.indigo, fontFamily: "'Noto Sans TC', sans-serif", border: `1px solid ${theme.border}` }}
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
-        <div className="flex gap-2 pb-3 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-          {NEARBY_FILTERS.map((f) => {
-            const active = activeFilters.has(f.key);
-            return (
-              <button
-                key={f.key}
-                onClick={() => toggleFilter(f.key)}
-                className="px-3.5 py-1.5 rounded-full text-sm whitespace-nowrap flex-shrink-0 transition-colors"
-                style={{
-                  backgroundColor: active ? theme.indigo : theme.bgCard,
-                  color: active ? "#fff" : theme.textSecondary,
-                  border: `1px solid ${active ? theme.indigo : theme.border}`,
-                  fontFamily: "'Noto Sans TC', sans-serif",
-                  fontWeight: active ? 700 : 500,
-                }}
-              >
-                {f.label}
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="flex flex-col gap-3">
-          {displayed.length === 0 && !dayData.remoteNotice && (
+        {messages.map((m, i) => (
+          <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
             <div
-              className="rounded-2xl px-4 py-8 flex flex-col items-center gap-2"
-              style={{ backgroundColor: theme.bgCard, border: `1px solid ${theme.border}` }}
+              className="rounded-2xl px-4 py-2.5 flex items-start gap-2"
+              style={{
+                maxWidth: "82%",
+                backgroundColor: m.role === "user" ? theme.indigo : theme.bgCard,
+                border: m.role === "user" ? "none" : `1px solid ${theme.border}`,
+              }}
             >
-              <Compass size={28} color={theme.textFaint} />
-              <p className="text-sm text-center" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
-                這個分類今天沒有查到符合的地點
+              {m.role === "assistant" && <Bot size={14} color={theme.indigo} className="flex-shrink-0 mt-1" />}
+              <p
+                className="text-sm whitespace-pre-wrap"
+                style={{ color: m.role === "user" ? "#fff" : theme.textPrimary, fontFamily: "'Noto Sans TC', sans-serif" }}
+              >
+                {m.text}
               </p>
             </div>
-          )}
+          </div>
+        ))}
 
-          {displayed.length === 0 && dayData.remoteNotice && dayData.places.length === 0 && (
-            <div
-              className="rounded-2xl px-4 py-6 flex flex-col items-center gap-2"
-              style={{ backgroundColor: theme.bgCard, border: `1px solid ${theme.border}` }}
-            >
-              <MapPin size={24} color={theme.textFaint} />
-              <p className="text-xs text-center" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
-                今晚步行範圍內沒有查到可靠的店家資訊，請參考上方說明
-              </p>
+        {isLoading && (
+          <div className="flex justify-start">
+            <div className="rounded-2xl px-4 py-2.5 flex items-center gap-2" style={{ backgroundColor: theme.bgCard, border: `1px solid ${theme.border}` }}>
+              <Bot size={14} color={theme.indigo} />
+              <span className="text-sm animate-pulse" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+                思考中…
+              </span>
             </div>
-          )}
+          </div>
+        )}
 
-          {displayed.map((place) => {
-            const Icon = NEARBY_ICON[place.category] || Store;
-            const hs = hoursStyle(place.hoursType);
-            const isOpen = expandedId === place.id;
-            const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-              place.mapsQuery
-            )}`;
+        {errorMsg && (
+          <div
+            className="rounded-2xl px-4 py-3 flex items-start gap-2"
+            style={{ backgroundColor: theme.accentRedSoft, border: `1px solid ${theme.accentRed}` }}
+          >
+            <AlertTriangle size={15} color={theme.accentRed} className="flex-shrink-0 mt-0.5" />
+            <p className="text-xs leading-relaxed" style={{ color: theme.textPrimary, fontFamily: "'Noto Sans TC', sans-serif" }}>
+              {errorMsg}
+            </p>
+          </div>
+        )}
+        <div style={{ height: 8 }} />
+      </div>
 
-            return (
-              <div
-                key={place.id}
-                className="rounded-2xl overflow-hidden"
-                style={{ backgroundColor: theme.bgCard, border: `1px solid ${theme.border}` }}
-              >
-                <button
-                  className="w-full text-left px-3 py-3 flex items-center gap-3"
-                  onClick={() => setExpandedId((prev) => (prev === place.id ? null : place.id))}
-                >
-                  <div
-                    className="flex items-center justify-center rounded-xl flex-shrink-0"
-                    style={{ width: 44, height: 44, backgroundColor: theme.bgSunken }}
-                  >
-                    <Icon size={20} color={theme.indigo} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p
-                      className="text-sm font-semibold truncate"
-                      style={{ color: theme.textPrimary, fontFamily: "'Noto Sans TC', sans-serif" }}
-                    >
-                      {place.name}
-                    </p>
-                    <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                      <Footprints size={13} color={theme.textFaint} />
-                      <span
-                        className="text-xs"
-                        style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}
-                      >
-                        {place.distanceLabel}
-                      </span>
-                      <span
-                        className="text-xs px-2 py-0.5 rounded-full"
-                        style={{ backgroundColor: hs.bg, color: hs.color, fontFamily: "'Noto Sans TC', sans-serif", fontWeight: 700 }}
-                      >
-                        {place.hoursLabel}
-                      </span>
-                    </div>
-                  </div>
-                  <ChevronDown
-                    size={17}
-                    color={theme.textSecondary}
-                    style={{
-                      transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
-                      transition: "transform 0.2s ease",
-                      flexShrink: 0,
-                    }}
-                  />
-                </button>
-
-                {isOpen && (
-                  <div className="px-3 pb-3">
-                    <a
-                      href={mapsUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="w-full flex items-center justify-center gap-2 rounded-xl py-2.5"
-                      style={{ backgroundColor: theme.indigo, textDecoration: "none" }}
-                    >
-                      <Navigation2 size={16} color="#fff" />
-                      <span
-                        className="text-sm font-bold"
-                        style={{ color: "#fff", fontFamily: "'Noto Sans TC', sans-serif" }}
-                      >
-                        導航至 Google Maps
-                      </span>
-                    </a>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+      <div className="px-4 py-3 flex items-center gap-2" style={{ borderTop: `1px solid ${theme.border}` }}>
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => (e.key === "Enter" ? sendMessage(input) : null)}
+          placeholder="問問行程、購物、日語……"
+          className="flex-1 min-w-0 rounded-full px-4 py-2.5 text-sm outline-none"
+          style={{ backgroundColor: theme.bgSunken, color: theme.textPrimary, border: `1px solid ${theme.border}`, fontFamily: "'Noto Sans TC', sans-serif" }}
+        />
+        <button
+          onClick={() => sendMessage(input)}
+          disabled={!input.trim() || isLoading}
+          className="flex items-center justify-center rounded-full flex-shrink-0"
+          style={{ width: 40, height: 40, backgroundColor: input.trim() && !isLoading ? theme.indigo : theme.bgSunken }}
+        >
+          <Send size={16} color={input.trim() && !isLoading ? "#fff" : theme.textFaint} />
+        </button>
       </div>
     </div>
   );
@@ -2788,7 +3212,47 @@ function SettingsModal({ theme, isOpen, onClose, isAdmin, setIsAdmin, onReset, h
    Header / Bottom Nav
    ====================================================================== */
 
-function Header({ theme, isDark, setIsDark, day, dayIndex, totalDays, isAdmin, onOpenEmergency, onOpenSettings }) {
+function Header({
+  theme,
+  isDark,
+  setIsDark,
+  day,
+  dayIndex,
+  totalDays,
+  isAdmin,
+  onOpenEmergency,
+  onOpenSettings,
+  locationEnabled,
+  onToggleLocation,
+  geoStatus,
+  matchedStopName,
+}) {
+  const [showStatus, setShowStatus] = useState(false);
+
+  const locationColor = () => {
+    if (!locationEnabled) return { bg: theme.bgSunken, icon: theme.textSecondary };
+    if (geoStatus === "error" || geoStatus === "unsupported") return { bg: theme.accentRedSoft, icon: theme.accentRed };
+    return { bg: theme.indigo, icon: "#fff" };
+  };
+  const loc = locationColor();
+
+  const statusText = () => {
+    if (!locationEnabled) return "定位未開啟，點擊開啟";
+    if (geoStatus === "locating") return "定位中…";
+    if (geoStatus === "unsupported") return "此環境不支援定位（請在手機瀏覽器開啟）";
+    if (geoStatus === "error") return "定位失敗，請確認已允許定位權限";
+    if (geoStatus === "ok" && matchedStopName) return `📍 你在「${matchedStopName}」附近`;
+    if (geoStatus === "ok") return "已定位，目前不在任何景點附近";
+    return "";
+  };
+
+  const handleTap = () => {
+    onToggleLocation();
+    setShowStatus(true);
+    window.clearTimeout(handleTap._t);
+    handleTap._t = window.setTimeout(() => setShowStatus(false), 3000);
+  };
+
   return (
     <div
       className="sticky top-0 z-20 flex items-center justify-between px-4 py-3"
@@ -2825,30 +3289,58 @@ function Header({ theme, isDark, setIsDark, day, dayIndex, totalDays, isAdmin, o
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5" style={{ position: "relative" }}>
+        <button
+          onClick={handleTap}
+          className="flex items-center justify-center rounded-full"
+          style={{ width: 32, height: 32, backgroundColor: loc.bg }}
+          aria-label="切換定位偵測"
+        >
+          <LocateFixed size={15} color={loc.icon} className={geoStatus === "locating" ? "animate-pulse" : ""} />
+        </button>
+
+        {showStatus && (
+          <div
+            className="absolute rounded-lg px-2.5 py-1.5"
+            style={{
+              top: 40,
+              right: 0,
+              backgroundColor: theme.bgCard,
+              border: `1px solid ${theme.border}`,
+              boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+              whiteSpace: "nowrap",
+              zIndex: 30,
+            }}
+          >
+            <p className="text-xs" style={{ color: theme.textPrimary, fontFamily: "'Noto Sans TC', sans-serif" }}>
+              {statusText()}
+            </p>
+          </div>
+        )}
+
         <button
           onClick={onOpenEmergency}
           className="flex items-center justify-center rounded-full"
-          style={{ width: 36, height: 36, backgroundColor: theme.accentRedSoft }}
+          style={{ width: 32, height: 32, backgroundColor: theme.accentRedSoft }}
           aria-label="緊急聯絡卡"
         >
-          <ShieldAlert size={17} color={theme.accentRed} />
+          <ShieldAlert size={15} color={theme.accentRed} />
         </button>
         <button
           onClick={() => setIsDark((d) => !d)}
           className="flex items-center justify-center rounded-full"
-          style={{ width: 36, height: 36, backgroundColor: theme.bgSunken }}
+          style={{ width: 32, height: 32, backgroundColor: theme.bgSunken }}
           aria-label="切換深淺色模式"
         >
-          {isDark ? <Sun size={18} color={theme.orange} /> : <Moon size={18} color={theme.indigo} />}
+          {isDark ? <Sun size={16} color={theme.orange} /> : <Moon size={16} color={theme.indigo} />}
         </button>
         <button
           onClick={onOpenSettings}
           className="flex items-center justify-center rounded-full"
-          style={{ width: 36, height: 36, backgroundColor: theme.bgSunken }}
+          style={{ width: 32, height: 32, backgroundColor: theme.bgSunken }}
           aria-label="設定"
         >
-          <Settings size={18} color={theme.textSecondary} />
+          <Settings size={16} color={theme.textSecondary} />
         </button>
       </div>
     </div>
@@ -2859,7 +3351,7 @@ function BottomNav({ theme, activeTab, setActiveTab }) {
   const tabs = [
     { key: "itinerary", label: "今日行程", icon: MapPin },
     { key: "shopping", label: "購物清單", icon: ShoppingCart },
-    { key: "nearby", label: "周邊探索", icon: Compass },
+    { key: "chat", label: "旅遊小幫手", icon: MessageCircle },
   ];
 
   return (
@@ -2914,6 +3406,8 @@ export default function JapanTourApp() {
   const [dayIndex, setDayIndex] = useState(0);
   const [emergencyOpen, setEmergencyOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [locationEnabled, setLocationEnabled] = useLocalStorage("locationEnabled", false);
+  const geo = useGeolocation(locationEnabled);
 
   // ---- 持久化資料（localStorage，含安全降級）----
   const [daysData, setDaysData] = useLocalStorage("days", DAYS);
@@ -2925,6 +3419,24 @@ export default function JapanTourApp() {
   // daysData 可能因重置或舊資料而長度不同，用 dayIndex 邊界保護
   const safeDayIndex = Math.min(dayIndex, daysData.length - 1);
   const day = daysData[safeDayIndex];
+
+  // 依目前位置比對這一天所有有座標的站點，找出最近且在範圍內的一個
+  const autoCurrentId = useMemo(() => {
+    if (geo.status !== "ok") return null;
+    let bestId = null;
+    let bestDist = Infinity;
+    day.stops.forEach((s) => {
+      if (!s.coords) return;
+      const d = distanceMeters(geo.lat, geo.lng, s.coords.lat, s.coords.lng);
+      if (d < bestDist) {
+        bestDist = d;
+        bestId = s.id;
+      }
+    });
+    return bestDist <= AUTO_MATCH_RADIUS_M ? bestId : null;
+  }, [geo.status, geo.lat, geo.lng, day]);
+
+  const matchedStop = day.stops.find((s) => s.id === autoCurrentId);
 
   // 更新某一天的 stops（管理者編輯行程用）
   const updateDayStops = (dIndex, newStops) => {
@@ -2938,6 +3450,7 @@ export default function JapanTourApp() {
     setNotes({});
     setIsAdmin(false);
     setDayIndex(0);
+    setLocationEnabled(false);
     setSettingsOpen(false);
   };
 
@@ -2960,6 +3473,10 @@ export default function JapanTourApp() {
           isAdmin={isAdmin}
           onOpenEmergency={() => setEmergencyOpen(true)}
           onOpenSettings={() => setSettingsOpen(true)}
+          locationEnabled={locationEnabled}
+          onToggleLocation={() => setLocationEnabled((v) => !v)}
+          geoStatus={geo.status}
+          matchedStopName={matchedStop ? matchedStop.name : null}
         />
 
         <div className="flex-1 overflow-y-auto">
@@ -2974,13 +3491,14 @@ export default function JapanTourApp() {
               updateDayStops={updateDayStops}
               notes={notes}
               setNotes={setNotes}
+              autoCurrentId={autoCurrentId}
             />
           )}
           {activeTab === "shopping" && (
             <ShoppingTab theme={theme} items={shoppingItems} setItems={setShoppingItems} />
           )}
-          {activeTab === "nearby" && (
-            <NearbyTab theme={theme} day={day} days={daysData} dayIndex={safeDayIndex} setDayIndex={setDayIndex} />
+          {activeTab === "chat" && (
+            <ChatTab theme={theme} days={daysData} shoppingItems={shoppingItems} isAdmin={isAdmin} />
           )}
         </div>
 
