@@ -52,6 +52,7 @@ import {
   Map,
   ExternalLink,
   Coffee,
+  Clock,
 } from "lucide-react";
 
 /* ======================================================================
@@ -1122,6 +1123,294 @@ function useFonts() {
       "https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap";
     document.head.appendChild(link);
   }, []);
+}
+
+function GatherEditModal({ theme, isOpen, onClose, onSave, onClear, initialLabel, initialIso, hasExisting }) {
+  const [label, setLabel] = useState("");
+  const [timeValue, setTimeValue] = useState("");
+
+  useEffect(() => {
+    if (isOpen) {
+      setLabel(initialLabel || "");
+      if (initialIso) {
+        setTimeValue(isoToDatetimeLocal(initialIso));
+      } else {
+        const defaultTarget = new Date(Date.now() + 30 * 60 * 1000);
+        setTimeValue(isoToDatetimeLocal(defaultTarget.toISOString()));
+      }
+    }
+  }, [isOpen, initialLabel, initialIso]);
+
+  if (!isOpen) return null;
+
+  const handleSave = () => {
+    const d = new Date(timeValue);
+    if (isNaN(d.getTime())) return;
+    onSave({ label: label.trim() || "集合地點", targetIso: d.toISOString() });
+  };
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-end justify-center" style={{ backgroundColor: "rgba(0,0,0,0.5)" }} onClick={onClose}>
+      <div
+        className="w-full flex flex-col"
+        style={{ maxWidth: 430, backgroundColor: theme.bgPage, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: "hidden" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-4 py-4" style={{ borderBottom: `1px solid ${theme.border}` }}>
+          <div className="flex items-center gap-2">
+            <Clock size={20} color={theme.indigo} />
+            <h2 className="text-base font-bold" style={{ color: theme.textPrimary, fontFamily: "'Noto Serif TC', serif" }}>
+              設定集合時間
+            </h2>
+          </div>
+          <button onClick={onClose} className="flex items-center justify-center rounded-full" style={{ width: 30, height: 30, backgroundColor: theme.bgSunken }}>
+            <X size={15} color={theme.textSecondary} />
+          </button>
+        </div>
+
+        <div className="px-4 py-4 flex flex-col gap-3">
+          <div>
+            <label className="text-xs font-bold mb-1 block" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+              地點／說明（已依目前定位建議帶入，可自行修改）
+            </label>
+            <input
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder="例如：晴空塔正門口"
+              className="w-full rounded-xl px-3 py-2.5 text-sm outline-none"
+              style={{ backgroundColor: theme.bgSunken, color: theme.textPrimary, border: `1px solid ${theme.border}`, fontFamily: "'Noto Sans TC', sans-serif" }}
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-bold mb-1 block" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+              集合時間
+            </label>
+            <input
+              type="datetime-local"
+              value={timeValue}
+              onChange={(e) => setTimeValue(e.target.value)}
+              className="w-full rounded-xl px-3 py-2.5 text-sm outline-none"
+              style={{
+                backgroundColor: theme.bgSunken,
+                color: theme.textPrimary,
+                border: `1px solid ${theme.indigoSoft}`,
+                fontFamily: "'JetBrains Mono', monospace",
+              }}
+            />
+          </div>
+
+          <button
+            onClick={handleSave}
+            className="w-full rounded-xl py-3 text-sm font-bold mt-1"
+            style={{ backgroundColor: theme.indigo, color: "#fff", fontFamily: "'Noto Sans TC', sans-serif" }}
+          >
+            {hasExisting ? "更新集合時間" : "開始倒數"}
+          </button>
+
+          {hasExisting && (
+            <button
+              onClick={onClear}
+              className="w-full rounded-xl py-2.5 text-sm font-bold"
+              style={{ backgroundColor: theme.accentRedSoft, color: theme.accentRed, fontFamily: "'Noto Sans TC', sans-serif" }}
+            >
+              取消這次集合
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function GatherDetailPopover({ theme, isOpen, onClose, gatherTarget, now, isAdmin, onEdit }) {
+  if (!isOpen || !gatherTarget) return null;
+  const target = new Date(gatherTarget.targetIso);
+  const diffMs = target.getTime() - now.getTime();
+  const isPast = diffMs <= 0;
+  const abs = Math.max(diffMs, 0);
+  const hh = Math.floor(abs / 3600000);
+  const mm = Math.floor((abs % 3600000) / 60000);
+  const ss = Math.floor((abs % 60000) / 1000);
+  const pad = (n) => String(n).padStart(2, "0");
+  const timeLabel = target.toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" });
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-end justify-center" style={{ backgroundColor: "rgba(0,0,0,0.5)" }} onClick={onClose}>
+      <div
+        className="w-full flex flex-col items-center"
+        style={{ maxWidth: 430, backgroundColor: theme.bgPage, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: "28px 20px" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-1.5 mb-1">
+          <Clock size={14} color={theme.textFaint} />
+          <span className="text-xs" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+            {gatherTarget.label}
+          </span>
+        </div>
+        <p
+          className="mb-1"
+          style={{
+            fontSize: 40,
+            fontWeight: 700,
+            color: isPast ? theme.accentRed : theme.textPrimary,
+            fontFamily: "'JetBrains Mono', monospace",
+          }}
+        >
+          {isPast ? "已到集合時間" : `${hh > 0 ? pad(hh) + ":" : ""}${pad(mm)}:${pad(ss)}`}
+        </p>
+        <p className="text-xs mb-5" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+          集合時間 {timeLabel}
+        </p>
+        <div className="w-full flex gap-2">
+          <button
+            onClick={onClose}
+            className="flex-1 rounded-xl py-3 text-sm font-bold"
+            style={{ backgroundColor: theme.bgSunken, color: theme.textSecondary, fontFamily: "'Noto Sans TC', sans-serif" }}
+          >
+            關閉
+          </button>
+          {isAdmin && (
+            <button
+              onClick={onEdit}
+              className="flex-1 rounded-xl py-3 text-sm font-bold"
+              style={{ backgroundColor: theme.indigo, color: "#fff", fontFamily: "'Noto Sans TC', sans-serif" }}
+            >
+              編輯
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function GatherCountdownBadge({ theme, isAdmin, gatherTarget, setGatherTarget, suggestedLabel }) {
+  const [now, setNow] = useState(() => new Date());
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const handleSave = ({ label, targetIso }) => {
+    setGatherTarget({ label, targetIso });
+    setEditOpen(false);
+    setDetailOpen(false);
+  };
+
+  const handleClear = () => {
+    setGatherTarget(null);
+    setEditOpen(false);
+    setDetailOpen(false);
+  };
+
+  // 尚未設定集合時間：只有管理者看得到一個小小的「設定」按鈕，一般使用者不顯示
+  if (!gatherTarget) {
+    if (!isAdmin) return null;
+    return (
+      <>
+        <button
+          onClick={() => setEditOpen(true)}
+          className="flex items-center justify-center"
+          style={{
+            position: "fixed",
+            top: 64,
+            right: 16,
+            zIndex: 25,
+            width: 44,
+            height: 44,
+            borderRadius: "50%",
+            backgroundColor: theme.bgCard,
+            border: `1px solid ${theme.border}`,
+            boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+          }}
+          aria-label="設定集合時間"
+        >
+          <Clock size={18} color={theme.textSecondary} />
+        </button>
+        <GatherEditModal
+          theme={theme}
+          isOpen={editOpen}
+          onClose={() => setEditOpen(false)}
+          onSave={handleSave}
+          onClear={handleClear}
+          initialLabel={suggestedLabel}
+          initialIso={null}
+          hasExisting={false}
+        />
+      </>
+    );
+  }
+
+  const target = new Date(gatherTarget.targetIso);
+  const diffMs = target.getTime() - now.getTime();
+  const isPast = diffMs <= 0;
+  const abs = Math.max(diffMs, 0);
+  const hh = Math.floor(abs / 3600000);
+  const mm = Math.floor((abs % 3600000) / 60000);
+  const ss = Math.floor((abs % 60000) / 1000);
+  const pad = (n) => String(n).padStart(2, "0");
+
+  return (
+    <>
+      <button
+        onClick={() => setDetailOpen(true)}
+        className="flex flex-col items-center justify-center"
+        style={{
+          position: "fixed",
+          top: 60,
+          right: 16,
+          zIndex: 25,
+          width: 60,
+          height: 60,
+          borderRadius: "50%",
+          backgroundColor: isPast ? theme.accentRed : theme.indigo,
+          boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
+          border: "none",
+        }}
+        aria-label="集合倒數"
+      >
+        <span style={{ fontSize: 9, color: "rgba(255,255,255,0.85)", fontFamily: "'Noto Sans TC', sans-serif" }}>集合</span>
+        <span
+          style={{
+            fontSize: isPast ? 10 : hh > 0 ? 12 : 14,
+            color: "#fff",
+            fontWeight: 700,
+            fontFamily: "'JetBrains Mono', monospace",
+          }}
+        >
+          {isPast ? "已到" : hh > 0 ? `${hh}:${pad(mm)}` : `${pad(mm)}:${pad(ss)}`}
+        </span>
+      </button>
+
+      <GatherDetailPopover
+        theme={theme}
+        isOpen={detailOpen}
+        onClose={() => setDetailOpen(false)}
+        gatherTarget={gatherTarget}
+        now={now}
+        isAdmin={isAdmin}
+        onEdit={() => {
+          setDetailOpen(false);
+          setEditOpen(true);
+        }}
+      />
+
+      <GatherEditModal
+        theme={theme}
+        isOpen={editOpen}
+        onClose={() => setEditOpen(false)}
+        onSave={handleSave}
+        onClear={handleClear}
+        initialLabel={gatherTarget.label}
+        initialIso={gatherTarget.targetIso}
+        hasExisting={true}
+      />
+    </>
+  );
 }
 
 function CountdownTicket({ theme, targetTime }) {
@@ -4028,6 +4317,7 @@ export default function JapanTourApp() {
   const [shoppingItems, setShoppingItems] = useLocalStorage("shopping", SHOPPING_ITEMS);
   const [notes, setNotes] = useLocalStorage("notes", {}); // { [stopId]: "使用者的個人筆記" }
   const [isAdmin, setIsAdmin] = useLocalStorage("isAdmin", false);
+  const [gatherTarget, setGatherTarget] = useLocalStorage("gatherTarget", null); // { label, targetIso } | null
 
   const theme = isDark ? DARK : LIGHT;
   // daysData 可能因重置或舊資料而長度不同，用 dayIndex 邊界保護
@@ -4051,6 +4341,7 @@ export default function JapanTourApp() {
   }, [geo.status, geo.lat, geo.lng, day]);
 
   const matchedStop = day.stops.find((s) => s.id === autoCurrentId);
+  const suggestedGatherLabel = matchedStop ? matchedStop.name : day.cityLabel;
 
   // 更新某一天的 stops（管理者編輯行程用）
   const updateDayStops = (dIndex, newStops) => {
@@ -4091,6 +4382,14 @@ export default function JapanTourApp() {
           onToggleLocation={() => setLocationEnabled((v) => !v)}
           geoStatus={geo.status}
           matchedStopName={matchedStop ? matchedStop.name : null}
+        />
+
+        <GatherCountdownBadge
+          theme={theme}
+          isAdmin={isAdmin}
+          gatherTarget={gatherTarget}
+          setGatherTarget={setGatherTarget}
+          suggestedLabel={suggestedGatherLabel}
         />
 
         <div className={activeTab === "chat" ? "flex-1 min-h-0 flex flex-col" : "flex-1 overflow-y-auto"}>

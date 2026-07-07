@@ -28,6 +28,45 @@ function checkRateLimit(key) {
   return entry.count <= RATE_LIMIT_MAX;
 }
 
+// 依序嘗試多個公開 Overpass 鏡像站：第一個回應失敗（含 429 額度限制）就自動換下一個，
+// 不用整個功能因為單一鏡像站當下忙碌就掛掉。這些站台都是社群free 資源，穩定度本來就會浮動。
+const OVERPASS_MIRRORS = [
+  "https://overpass.kumi.systems/api/interpreter",
+  "https://overpass-api.de/api/interpreter",
+];
+
+async function queryOverpass(query) {
+  let lastError = null;
+
+  for (const url of OVERPASS_MIRRORS) {
+    try {
+      const overpassRes = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Accept: "application/json",
+          "User-Agent": "KaohsiungJapanTourApp/1.0 (personal travel itinerary app; not for commercial use)",
+        },
+        body: "data=" + encodeURIComponent(query),
+      });
+
+      if (!overpassRes.ok) {
+        const errText = await overpassRes.text();
+        console.error(`Overpass mirror ${url} error:`, overpassRes.status, errText.slice(0, 300));
+        lastError = { status: overpassRes.status, detail: errText.slice(0, 300) };
+        continue; // 換下一個鏡像站
+      }
+
+      return { ok: true, json: await overpassRes.json() };
+    } catch (err) {
+      console.error(`Overpass mirror ${url} fetch failed:`, err);
+      lastError = { status: null, detail: String(err) };
+    }
+  }
+
+  return { ok: false, error: lastError };
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     res.status(405).json({ error: "Method not allowed" });
@@ -57,33 +96,16 @@ export default async function handler(req, res) {
     `node["historic"](around:${radius},${lat},${lng});` +
     `);out body;`;
 
-  try {
-    const overpassRes = await fetch("https://overpass-api.de/api/interpreter", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Accept: "application/json",
-        // Overpass API 的使用規範明確要求呼叫端設定可辨識身份的 User-Agent，
-        // 沒有的話容易被伺服器的防護機制當成機器人擋下（406 Not Acceptable 常見成因之一）。
-        "User-Agent": "KaohsiungJapanTourApp/1.0 (personal travel itinerary app; not for commercial use)",
-      },
-      body: "data=" + encodeURIComponent(query),
+  const result = await queryOverpass(query);
+
+  if (!result.ok) {
+    const status = result.error?.status || 502;
+    res.status(status === 429 ? 429 : 502).json({
+      error: `所有 Overpass 鏡像站都查詢失敗（最後一個回應：HTTP ${result.error?.status ?? "無回應"}）`,
+      detail: result.error?.detail || "",
     });
-
-    if (!overpassRes.ok) {
-      const errText = await overpassRes.text();
-      console.error("Overpass error:", overpassRes.status, errText.slice(0, 300));
-      res.status(502).json({
-        error: `Overpass 回應錯誤（HTTP ${overpassRes.status}）`,
-        detail: errText.slice(0, 300),
-      });
-      return;
-    }
-
-    const json = await overpassRes.json();
-    res.status(200).json({ elements: json.elements || [] });
-  } catch (err) {
-    console.error("Overpass fetch failed:", err);
-    res.status(500).json({ error: "查詢 Overpass 時發生錯誤", detail: String(err) });
+    return;
   }
+
+  res.status(200).json({ elements: result.json.elements || [] });
 }
