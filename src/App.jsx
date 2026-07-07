@@ -256,6 +256,7 @@ function useNearbyOSM(cacheKey, coords, radiusMeters) {
   const cacheRef = useRef(cache);
   cacheRef.current = cache;
   const [status, setStatus] = useState("idle"); // idle | loading | ok | error
+  const [errorDetail, setErrorDetail] = useState(null);
 
   useEffect(() => {
     if (!coords || !cacheKey) return;
@@ -270,6 +271,7 @@ function useNearbyOSM(cacheKey, coords, radiusMeters) {
       }
 
       setStatus("loading");
+      setErrorDetail(null);
       const query =
         `[out:json][timeout:25];(` +
         `node["shop"](around:${radiusMeters},${coords.lat},${coords.lng});` +
@@ -284,6 +286,11 @@ function useNearbyOSM(cacheKey, coords, radiusMeters) {
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: "data=" + encodeURIComponent(query),
         });
+
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+
         const json = await res.json();
         const places = (json.elements || [])
           .filter((el) => el.tags && el.tags.name && el.lat != null && el.lon != null)
@@ -301,7 +308,12 @@ function useNearbyOSM(cacheKey, coords, radiusMeters) {
           setStatus("ok");
         }
       } catch (e) {
-        if (!cancelled) setStatus("error");
+        if (!cancelled) {
+          setStatus("error");
+          // CORS 類的錯誤瀏覽器基於安全考量不會給 JS 詳細原因，這裡能拿到的訊息通常
+          // 就只有 "Failed to fetch" 這種泛用文字；HTTP 狀態碼（如 429/504）則能正常顯示。
+          setErrorDetail(e && e.message ? e.message : String(e));
+        }
       }
     };
 
@@ -313,7 +325,7 @@ function useNearbyOSM(cacheKey, coords, radiusMeters) {
   }, [cacheKey, coords?.lat, coords?.lng, radiusMeters]);
 
   const places = cache[cacheKey]?.places || [];
-  return { places, status };
+  return { places, status, errorDetail };
 }
 
 /* ======================================================================
@@ -1253,7 +1265,7 @@ function OsmPlaceRow({ theme, place }) {
 }
 
 function NearbyLiveSection({ theme, cacheKey, coords, radiusMeters }) {
-  const { places, status } = useNearbyOSM(cacheKey, coords, radiusMeters);
+  const { places, status, errorDetail } = useNearbyOSM(cacheKey, coords, radiusMeters);
 
   return (
     <div className="mt-4">
@@ -1274,8 +1286,8 @@ function NearbyLiveSection({ theme, cacheKey, coords, radiusMeters }) {
       )}
 
       {status === "error" && places.length === 0 && (
-        <p className="text-xs" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
-          查詢失敗，可能是網路問題或暫時查詢額度限制，稍後重新整理再試
+        <p className="text-xs" style={{ color: theme.accentRed, fontFamily: "'Noto Sans TC', sans-serif" }}>
+          查詢失敗{errorDetail ? `（${errorDetail}）` : ""}，稍後重新整理再試
         </p>
       )}
 
@@ -3134,7 +3146,7 @@ function ShoppingTab({ theme, items, setItems, days, onNavigateToItinerary }) {
 
 function NearbyExploreTab({ theme, day, days, dayIndex, setDayIndex }) {
   const [openCategory, setOpenCategory] = useState(null);
-  const { places: allPlaces, status } = useNearbyOSM(`day-${day.id}`, day.coords, 1000);
+  const { places: allPlaces, status, errorDetail } = useNearbyOSM(`day-${day.id}`, day.coords, 1000);
 
   const bucketed = useMemo(() => {
     const buckets = { attraction: [], mall: [], department: [], drugstore: [] };
@@ -3168,8 +3180,8 @@ function NearbyExploreTab({ theme, day, days, dayIndex, setDayIndex }) {
         )}
 
         {status === "error" && allPlaces.length === 0 && (
-          <p className="text-xs text-center py-4" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
-            查詢失敗，可能是網路問題，稍後重新整理再試
+          <p className="text-xs text-center py-4" style={{ color: theme.accentRed, fontFamily: "'Noto Sans TC', sans-serif" }}>
+            查詢失敗{errorDetail ? `（${errorDetail}）` : ""}，稍後重新整理再試
           </p>
         )}
 
