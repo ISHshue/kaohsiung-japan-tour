@@ -956,22 +956,6 @@ const CATEGORY_ICON = {
   全部: ShoppingBag,
 };
 
-// 「周邊探索」分頁專用：景點／商場／百貨／藥妝 四大類，資料改為即時查詢 OpenStreetMap（見
-// useNearbyOSM Hook），這裡只保留分類的圖示與標籤對照。
-const EXPLORE_CATEGORY_ICON = {
-  attraction: Camera,
-  mall: ShoppingBag,
-  department: Building2,
-  drugstore: Pill,
-};
-
-const EXPLORE_CATEGORIES = [
-  { key: "attraction", label: "景點" },
-  { key: "mall", label: "商場" },
-  { key: "department", label: "百貨" },
-  { key: "drugstore", label: "藥妝" },
-];
-
 /* ======================================================================
    購物清單批次貼上：文字解析工具
    ----------------------------------------------------------------------
@@ -3459,19 +3443,22 @@ function ShoppingTab({ theme, items, setItems, days, onNavigateToItinerary }) {
 
 
 function NearbyExploreTab({ theme, day, days, dayIndex, setDayIndex }) {
-  const [openCategory, setOpenCategory] = useState(null);
-  const { places: allPlaces, status, errorDetail } = useNearbyOSM(`day-${day.id}`, day.coords, 1000);
-
-  const bucketed = useMemo(() => {
-    const buckets = { attraction: [], mall: [], department: [], drugstore: [] };
-    allPlaces.forEach((p) => {
-      if (buckets[p.cat.key]) buckets[p.cat.key].push(p);
-    });
-    return buckets;
-  }, [allPlaces]);
+  const [activeFilter, setActiveFilter] = useState(null);
+  const { places: allPlaces, status, errorDetail } = useNearbyOSM(`day-${day.id}`, day.coords, 800);
 
   const centerLabel = day.hotel ? day.hotel.name : day.cityLabel;
-  const totalBucketed = bucketed.attraction.length + bucketed.mall.length + bucketed.department.length + bucketed.drugstore.length;
+
+  // 分類篩選丸改成動態產生：只列出「這次真的查到的分類」，不會出現永遠是空的固定分類
+  const availableCats = useMemo(() => {
+    const map = new Map();
+    allPlaces.forEach((p) => {
+      if (!map.has(p.cat.key)) map.set(p.cat.key, { key: p.cat.key, label: p.cat.label, count: 0 });
+      map.get(p.cat.key).count += 1;
+    });
+    return [...map.values()].sort((a, b) => b.count - a.count);
+  }, [allPlaces]);
+
+  const displayed = activeFilter ? allPlaces.filter((p) => p.cat.key === activeFilter) : allPlaces;
 
   return (
     <div className="pt-4 pb-6">
@@ -3483,7 +3470,7 @@ function NearbyExploreTab({ theme, day, days, dayIndex, setDayIndex }) {
           周邊探索
         </h2>
         <p className="text-xs mb-1" style={{ color: theme.textSecondary, fontFamily: "'Noto Sans TC', sans-serif" }}>
-          以「{centerLabel}」為中心，方圓 1 公里
+          以「{centerLabel}」為中心，方圓 800 公尺
         </p>
         <p className="text-xs mb-3" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
           即時查詢 OpenStreetMap，涵蓋度依地區而異
@@ -3492,7 +3479,7 @@ function NearbyExploreTab({ theme, day, days, dayIndex, setDayIndex }) {
 
       <DaySwitcher theme={theme} days={days} dayIndex={dayIndex} setDayIndex={setDayIndex} />
 
-      <div className="px-4 flex flex-col gap-3">
+      <div className="px-4">
         {status === "loading" && allPlaces.length === 0 && (
           <p className="text-xs text-center py-4" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
             查詢中…
@@ -3505,100 +3492,63 @@ function NearbyExploreTab({ theme, day, days, dayIndex, setDayIndex }) {
           </p>
         )}
 
-        {status === "ok" && allPlaces.length > 0 && totalBucketed === 0 && (
-          <p className="text-xs text-center py-3 px-2" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
-            這個範圍內查到 {allPlaces.length} 筆一般資料，但沒有符合景點／商場／百貨／藥妝這幾個分類的地點
-          </p>
+        {status === "ok" && allPlaces.length === 0 && (
+          <div className="rounded-2xl px-4 py-8 flex flex-col items-center gap-2" style={{ backgroundColor: theme.bgCard, border: `1px solid ${theme.border}` }}>
+            <MapPin size={24} color={theme.textFaint} />
+            <p className="text-xs text-center" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+              這個範圍內沒有查到有登記店名的資料，實際情況以現場為準
+            </p>
+          </div>
         )}
 
-        {EXPLORE_CATEGORIES.map((cat) => {
-          const catPlaces = bucketed[cat.key] || [];
-          const Icon = EXPLORE_CATEGORY_ICON[cat.key];
-          const isOpen = openCategory === cat.key;
-          const hasPlaces = catPlaces.length > 0;
-          const preview = catPlaces[0];
+        {availableCats.length > 0 && (
+          <div className="flex gap-2 pb-3 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+            <button
+              onClick={() => setActiveFilter(null)}
+              className="px-3.5 py-1.5 rounded-full text-sm whitespace-nowrap flex-shrink-0"
+              style={{
+                backgroundColor: !activeFilter ? theme.indigo : theme.bgCard,
+                color: !activeFilter ? "#fff" : theme.textSecondary,
+                border: `1px solid ${!activeFilter ? theme.indigo : theme.border}`,
+                fontFamily: "'Noto Sans TC', sans-serif",
+                fontWeight: !activeFilter ? 700 : 500,
+              }}
+            >
+              全部（{allPlaces.length}）
+            </button>
+            {availableCats.map((c) => {
+              const active = activeFilter === c.key;
+              return (
+                <button
+                  key={c.key}
+                  onClick={() => setActiveFilter((prev) => (prev === c.key ? null : c.key))}
+                  className="px-3.5 py-1.5 rounded-full text-sm whitespace-nowrap flex-shrink-0"
+                  style={{
+                    backgroundColor: active ? theme.indigo : theme.bgCard,
+                    color: active ? "#fff" : theme.textSecondary,
+                    border: `1px solid ${active ? theme.indigo : theme.border}`,
+                    fontFamily: "'Noto Sans TC', sans-serif",
+                    fontWeight: active ? 700 : 500,
+                  }}
+                >
+                  {c.label}（{c.count}）
+                </button>
+              );
+            })}
+          </div>
+        )}
 
-          return (
-            <div key={cat.key} className="rounded-2xl overflow-hidden" style={{ backgroundColor: theme.bgCard, border: `1px solid ${theme.border}` }}>
-              <button
-                className="w-full text-left px-4 py-3 flex items-center gap-3"
-                onClick={() => hasPlaces && setOpenCategory((prev) => (prev === cat.key ? null : cat.key))}
-              >
-                <div className="flex items-center justify-center rounded-xl flex-shrink-0" style={{ width: 40, height: 40, backgroundColor: theme.bgSunken }}>
-                  <Icon size={19} color={hasPlaces ? theme.indigo : theme.textFaint} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold mb-0.5" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
-                    {cat.label}
-                  </p>
-                  {hasPlaces ? (
-                    <>
-                      <p className="text-sm font-semibold truncate" style={{ color: theme.textPrimary, fontFamily: "'Noto Sans TC', sans-serif" }}>
-                        {preview.name}
-                      </p>
-                      <p className="text-xs mt-0.5" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
-                        約 {preview.dist} 公尺
-                      </p>
-                    </>
-                  ) : (
-                    <p className="text-sm" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
-                      {status === "loading" ? "查詢中…" : "無"}
-                    </p>
-                  )}
-                </div>
-                {hasPlaces && catPlaces.length > 1 && (
-                  <span
-                    className="text-xs px-2 py-0.5 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: theme.bgSunken, color: theme.textSecondary, fontFamily: "'Noto Sans TC', sans-serif" }}
-                  >
-                    共 {catPlaces.length}
-                  </span>
-                )}
-                {hasPlaces && (
-                  <ChevronDown
-                    size={16}
-                    color={theme.textSecondary}
-                    style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s ease", flexShrink: 0 }}
-                  />
-                )}
-              </button>
+        <div className="flex flex-col gap-2">
+          {displayed.slice(0, 30).map((place, i) => (
+            <OsmPlaceRow key={i} theme={theme} place={place} />
+          ))}
+        </div>
 
-              {isOpen && hasPlaces && (
-                <div className="px-4 pb-3 flex flex-col gap-2">
-                  {catPlaces.slice(0, 10).map((place, i) => {
-                    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.mapsQuery)}`;
-                    return (
-                      <div key={i} className="rounded-xl px-3 py-2.5" style={{ backgroundColor: theme.bgSunken, border: `1px solid ${theme.border}` }}>
-                        <p className="text-sm font-semibold" style={{ color: theme.textPrimary, fontFamily: "'Noto Sans TC', sans-serif" }}>
-                          {place.name}
-                        </p>
-                        <p className="text-xs mt-0.5 mb-2" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
-                          約 {place.dist} 公尺
-                        </p>
-                        <a
-                          href={mapsUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="flex items-center justify-center gap-1.5 rounded-lg py-2"
-                          style={{ backgroundColor: theme.indigo, textDecoration: "none" }}
-                        >
-                          <Navigation2 size={13} color="#fff" />
-                          <span className="text-xs font-bold" style={{ color: "#fff", fontFamily: "'Noto Sans TC', sans-serif" }}>
-                            導航至 Google Maps
-                          </span>
-                        </a>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          );
-        })}
-
-        <p className="text-xs mt-1" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
-          資料來自 OpenStreetMap 社群協作地圖，即時查詢、7 天內快取；顯示「無」代表方圓 1 公里內沒有查到符合條件且有登記店名的地點，不是系統漏掉。
-        </p>
+        {allPlaces.length > 0 && (
+          <p className="text-xs mt-3" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+            資料來自 OpenStreetMap 社群協作地圖，即時查詢、7 天內快取。
+          </p>
+        )}
       </div>
     </div>
   );
