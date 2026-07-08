@@ -1814,7 +1814,7 @@ function TimelineStop({
                   style={{ backgroundColor: theme.accentRed, color: "#fff", fontFamily: "'Noto Sans TC', sans-serif" }}
                 >
                   {isNearby && <LocateFixed size={10} />}
-                  {isManuallySet ? "已手動標記在此" : isNearby ? "你在這附近" : "現在"}
+                  {isManuallySet && isAdmin ? "已手動標記在此" : isNearby ? "你在這附近" : "現在"}
                 </span>
               )}
             </div>
@@ -2171,6 +2171,11 @@ function ItineraryTab({
   notes,
   setNotes,
   autoCurrentId,
+  effectiveCurrentId,
+  manualCurrentId,
+  setManualCurrentId,
+  inTransit,
+  setInTransit,
 }) {
   const stops = day.stops;
   const [expandedId, setExpandedId] = useState(
@@ -2178,24 +2183,17 @@ function ItineraryTab({
   );
   const [editingId, setEditingId] = useState(null);
   const [editValue, setEditValue] = useState("");
-  const [manualCurrentId, setManualCurrentId] = useState(null); // 管理者手動標記的目前位置，優先於 GPS
-  const [inTransit, setInTransit] = useState(false); // 是否正在遊覽車上移動
   const { liveData: liveWeather, isFetching: isWeatherFetching } = useDailyWeatherRefresh(day);
-
-  // 管理者手動標記優先；沒有手動標記時才用 GPS 偵測結果
-  const effectiveCurrentId = manualCurrentId || autoCurrentId;
 
   // 偵測到附近景點時，自動展開該站
   useEffect(() => {
     if (autoCurrentId) setExpandedId(autoCurrentId);
   }, [autoCurrentId]);
 
-  // 切換天數時，重設展開項、編輯狀態與手動標記
+  // 切換天數時，重設展開項與編輯狀態（手動標記/遊覽車狀態已經在 App 層級隨換天重置過了）
   useEffect(() => {
     setExpandedId((day.stops.find((s) => s.status === "current") || day.stops[0]).id);
     setEditingId(null);
-    setManualCurrentId(null);
-    setInTransit(false);
   }, [dayIndex]);
 
   const startEdit = (stopId) => {
@@ -4417,6 +4415,45 @@ function BottomNav({ theme, activeTab, setActiveTab }) {
    主程式
    ====================================================================== */
 
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  componentDidCatch(error, info) {
+    // 印到瀏覽器 Console，方便用電腦開發者工具查看完整堆疊
+    console.error("畫面渲染錯誤：", error, info);
+  }
+  render() {
+    if (this.state.error) {
+      const theme = this.props.theme;
+      return (
+        <div className="px-4 py-8 flex flex-col items-center gap-3" style={{ backgroundColor: theme.bgPage }}>
+          <AlertTriangle size={28} color={theme.accentRed} />
+          <p className="text-sm font-bold text-center" style={{ color: theme.textPrimary, fontFamily: "'Noto Sans TC', sans-serif" }}>
+            這個畫面發生錯誤，其他分頁不受影響
+          </p>
+          <div
+            className="w-full rounded-xl px-3 py-2 overflow-x-auto"
+            style={{ backgroundColor: theme.bgSunken, border: `1px solid ${theme.border}` }}
+          >
+            <pre style={{ margin: 0, fontSize: 11, color: theme.accentRed, whiteSpace: "pre-wrap", fontFamily: "'JetBrains Mono', monospace" }}>
+              {String((this.state.error && this.state.error.message) || this.state.error)}
+            </pre>
+          </div>
+          <p className="text-xs text-center" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+            請把這段錯誤訊息截圖回報，或切換到其他分頁繼續使用
+          </p>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function JapanTourApp() {
   useFonts();
   const [isDark, setIsDark] = useState(false);
@@ -4455,7 +4492,21 @@ export default function JapanTourApp() {
     return bestDist <= AUTO_MATCH_RADIUS_M ? bestId : null;
   }, [geo.status, geo.lat, geo.lng, day]);
 
-  const matchedStop = day.stops.find((s) => s.id === autoCurrentId);
+  // 管理者手動標記的目前位置／是否在遊覽車上移動，狀態放在這一層，
+  // 這樣 Header 的定位狀態跟行程頁的高亮顯示才會永遠是同一個答案，不會兜不起來。
+  const [manualCurrentId, setManualCurrentId] = useState(null);
+  const [inTransit, setInTransit] = useState(false);
+
+  // 切換天數時，手動標記跟遊覽車狀態要重置，不然會沿用到不同天
+  useEffect(() => {
+    setManualCurrentId(null);
+    setInTransit(false);
+  }, [safeDayIndex]);
+
+  // 管理者手動標記優先；沒有手動標記時才用 GPS 偵測結果
+  const effectiveCurrentId = manualCurrentId || autoCurrentId;
+
+  const matchedStop = day.stops.find((s) => s.id === effectiveCurrentId);
   const suggestedGatherLabel = matchedStop ? matchedStop.name : day.cityLabel;
 
   // 更新某一天的 stops（管理者編輯行程用）
@@ -4506,35 +4557,42 @@ export default function JapanTourApp() {
         />
 
         <div className={activeTab === "chat" ? "flex-1 min-h-0 flex flex-col" : "flex-1 overflow-y-auto"}>
-          {activeTab === "itinerary" && (
-            <ItineraryTab
-              theme={theme}
-              day={day}
-              days={daysData}
-              dayIndex={safeDayIndex}
-              setDayIndex={setDayIndex}
-              isAdmin={isAdmin}
-              updateDayStops={updateDayStops}
-              notes={notes}
-              setNotes={setNotes}
-              autoCurrentId={autoCurrentId}
-            />
-          )}
-          {activeTab === "shopping" && (
-            <ShoppingTab
-              theme={theme}
-              items={shoppingItems}
-              setItems={setShoppingItems}
-              days={daysData}
-              onNavigateToItinerary={() => setActiveTab("itinerary")}
-            />
-          )}
-          {activeTab === "nearby" && (
-            <NearbyExploreTab theme={theme} day={day} days={daysData} dayIndex={safeDayIndex} setDayIndex={setDayIndex} />
-          )}
-          {activeTab === "chat" && (
-            <ChatTab theme={theme} days={daysData} shoppingItems={shoppingItems} isAdmin={isAdmin} />
-          )}
+          <ErrorBoundary key={activeTab} theme={theme}>
+            {activeTab === "itinerary" && (
+              <ItineraryTab
+                theme={theme}
+                day={day}
+                days={daysData}
+                dayIndex={safeDayIndex}
+                setDayIndex={setDayIndex}
+                isAdmin={isAdmin}
+                updateDayStops={updateDayStops}
+                notes={notes}
+                setNotes={setNotes}
+                autoCurrentId={autoCurrentId}
+                effectiveCurrentId={effectiveCurrentId}
+                manualCurrentId={manualCurrentId}
+                setManualCurrentId={setManualCurrentId}
+                inTransit={inTransit}
+                setInTransit={setInTransit}
+              />
+            )}
+            {activeTab === "shopping" && (
+              <ShoppingTab
+                theme={theme}
+                items={shoppingItems}
+                setItems={setShoppingItems}
+                days={daysData}
+                onNavigateToItinerary={() => setActiveTab("itinerary")}
+              />
+            )}
+            {activeTab === "nearby" && (
+              <NearbyExploreTab theme={theme} day={day} days={daysData} dayIndex={safeDayIndex} setDayIndex={setDayIndex} />
+            )}
+            {activeTab === "chat" && (
+              <ChatTab theme={theme} days={daysData} shoppingItems={shoppingItems} isAdmin={isAdmin} />
+            )}
+          </ErrorBoundary>
         </div>
 
         <BottomNav theme={theme} activeTab={activeTab} setActiveTab={setActiveTab} />
