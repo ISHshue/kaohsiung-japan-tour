@@ -47,7 +47,7 @@ import {
   Coins,
   Menu,
   Ticket,
-  Map,
+  Map as MapIcon,
   ExternalLink,
   Coffee,
   Clock,
@@ -3134,7 +3134,7 @@ function MapOverviewModal({ theme, isOpen, onClose, days }) {
       >
         <div className="flex items-center justify-between px-4 py-4" style={{ borderBottom: `1px solid ${theme.border}` }}>
           <div className="flex items-center gap-2">
-            <Map size={20} color={theme.indigo} />
+            <MapIcon size={20} color={theme.indigo} />
             <h2 className="text-base font-bold" style={{ color: theme.textPrimary, fontFamily: "'Noto Serif TC', serif" }}>
               行程地圖總覽
             </h2>
@@ -3274,7 +3274,7 @@ function MoreMenuModal({ theme, isOpen, onClose, onOpenItinerary, onOpenCoupons,
     { label: "行程", icon: MapPin, onClick: onOpenItinerary },
     { label: "管理購物分類", icon: Tag, onClick: onOpenCategoryManager },
     { label: "日本藥妝優惠券", icon: Ticket, onClick: onOpenCoupons },
-    { label: "地圖", icon: Map, onClick: onOpenMap },
+    { label: "地圖", icon: MapIcon, onClick: onOpenMap },
     { label: "匯率換算", icon: Coins, onClick: onOpenCurrency },
   ];
   return (
@@ -3483,7 +3483,7 @@ function ShoppingTab({ theme, items, setItems, days, onNavigateToItinerary }) {
           backgroundColor: theme.bgCard,
           border: `1px solid ${theme.border}`,
           bottom: 144,
-          right: "calc(50% - 203px)",
+          right: 16,
         }}
         aria-label="更多"
       >
@@ -3498,7 +3498,7 @@ function ShoppingTab({ theme, items, setItems, days, onNavigateToItinerary }) {
           height: 52,
           backgroundColor: theme.indigo,
           bottom: 84,
-          right: "calc(50% - 199px)",
+          right: 16,
         }}
         aria-label="新增商品"
       >
