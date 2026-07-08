@@ -33,7 +33,6 @@ import {
   Settings,
   RotateCcw,
   StickyNote,
-  Eye,
   Plane,
   Plus,
   Trash2,
@@ -53,6 +52,7 @@ import {
   Coffee,
   Clock,
   Tag,
+  Bus,
 } from "lucide-react";
 
 /* ======================================================================
@@ -1524,43 +1524,56 @@ function OsmPlaceRow({ theme, place }) {
 }
 
 function NearbyLiveSection({ theme, cacheKey, coords, radiusMeters }) {
+  const [isOpen, setIsOpen] = useState(false);
   const { places, status, errorDetail } = useNearbyOSM(cacheKey, coords, radiusMeters);
 
   return (
     <div className="mt-4">
-      <div className="flex items-center gap-1.5 mb-2">
-        <Store size={15} color={theme.green} />
+      <button className="w-full flex items-center gap-1.5" onClick={() => setIsOpen((v) => !v)}>
+        <Store size={15} color={theme.indigo} />
         <span className="text-sm font-bold" style={{ color: theme.textPrimary, fontFamily: "'Noto Sans TC', sans-serif" }}>
           附近特色商家
         </span>
-        <span className="text-xs ml-auto" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
-          OpenStreetMap
-        </span>
-      </div>
+        {status === "ok" && places.length > 0 && (
+          <span className="text-xs" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+            （{places.length}）
+          </span>
+        )}
+        <ChevronDown
+          size={14}
+          color={theme.textSecondary}
+          className="ml-auto"
+          style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s ease" }}
+        />
+      </button>
 
-      {status === "loading" && places.length === 0 && (
-        <p className="text-xs" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
-          查詢中…
-        </p>
-      )}
+      {isOpen && (
+        <div className="mt-2">
+          {status === "loading" && places.length === 0 && (
+            <p className="text-xs" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+              查詢中…
+            </p>
+          )}
 
-      {status === "error" && places.length === 0 && (
-        <p className="text-xs" style={{ color: theme.accentRed, fontFamily: "'Noto Sans TC', sans-serif" }}>
-          查詢失敗{errorDetail ? `（${errorDetail}）` : ""}，稍後重新整理再試
-        </p>
-      )}
+          {status === "error" && places.length === 0 && (
+            <p className="text-xs" style={{ color: theme.accentRed, fontFamily: "'Noto Sans TC', sans-serif" }}>
+              查詢失敗{errorDetail ? `（${errorDetail}）` : ""}，稍後重新整理再試
+            </p>
+          )}
 
-      {status === "ok" && places.length === 0 && (
-        <p className="text-xs" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
-          這個範圍內沒有查到有登記店名的資料，實際情況以現場為準
-        </p>
-      )}
+          {status === "ok" && places.length === 0 && (
+            <p className="text-xs" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+              這個範圍內沒有查到有登記店名的資料，實際情況以現場為準
+            </p>
+          )}
 
-      {places.length > 0 && (
-        <div className="flex flex-col gap-2">
-          {places.slice(0, 8).map((p, i) => (
-            <OsmPlaceRow key={i} theme={theme} place={p} />
-          ))}
+          {places.length > 0 && (
+            <div className="flex flex-col gap-2">
+              {places.slice(0, 8).map((p, i) => (
+                <OsmPlaceRow key={i} theme={theme} place={p} />
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -1639,6 +1652,11 @@ function TimelineStop({
   isLast,
   isAdmin,
   isNearby,
+  isManuallySet,
+  isTransitFromHere,
+  onMarkAsHere,
+  onLeaveHere,
+  onToggleTransit,
   isEditing,
   editValue,
   onStartEdit,
@@ -1690,9 +1708,26 @@ function TimelineStop({
         {dot}
         {!isLast && (
           <div
-            className="flex-1"
+            className="relative flex-1"
             style={{ width: 2, backgroundColor: theme.border, marginTop: 2, minHeight: 20 }}
-          />
+          >
+            {isTransitFromHere && (
+              <div
+                className="absolute flex items-center justify-center rounded-full"
+                style={{
+                  top: "50%",
+                  left: "50%",
+                  transform: "translate(-50%, -50%)",
+                  width: 24,
+                  height: 24,
+                  backgroundColor: theme.indigo,
+                  boxShadow: `0 0 0 3px ${theme.bgPage}`,
+                }}
+              >
+                <Bus size={13} color="#fff" />
+              </div>
+            )}
+          </div>
         )}
       </div>
 
@@ -1779,7 +1814,7 @@ function TimelineStop({
                   style={{ backgroundColor: theme.accentRed, color: "#fff", fontFamily: "'Noto Sans TC', sans-serif" }}
                 >
                   {isNearby && <LocateFixed size={10} />}
-                  {isNearby ? "你在這附近" : "現在"}
+                  {isManuallySet ? "已手動標記在此" : isNearby ? "你在這附近" : "現在"}
                 </span>
               )}
             </div>
@@ -1815,6 +1850,37 @@ function TimelineStop({
             className="mt-2 rounded-2xl px-4 py-4"
             style={{ backgroundColor: theme.bgCard, border: `1px solid ${theme.border}` }}
           >
+            {isAdmin && (
+              <div className="flex gap-2 flex-wrap mb-3 pb-3" style={{ borderBottom: `1px solid ${theme.border}` }}>
+                {!isCurrent ? (
+                  <button
+                    onClick={onMarkAsHere}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold"
+                    style={{ backgroundColor: theme.indigo, color: "#fff", fontFamily: "'Noto Sans TC', sans-serif" }}
+                  >
+                    <LocateFixed size={12} /> 標記為目前位置
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      onClick={onToggleTransit}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold"
+                      style={{ backgroundColor: theme.orangeSoft, color: theme.orange, fontFamily: "'Noto Sans TC', sans-serif" }}
+                    >
+                      <Bus size={12} /> {isTransitFromHere ? "已抵達下一站" : "上車前往下一站"}
+                    </button>
+                    <button
+                      onClick={onLeaveHere}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold"
+                      style={{ backgroundColor: theme.bgSunken, color: theme.textSecondary, fontFamily: "'Noto Sans TC', sans-serif" }}
+                    >
+                      <X size={12} /> 離開此地
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+
             {stop.intro && (
               <p
                 className="text-sm leading-relaxed"
@@ -1856,7 +1922,7 @@ function TimelineStop({
             {stop.mustBuy.length > 0 && (
               <div className="mt-4">
                 <div className="flex items-center gap-1.5 mb-2">
-                  <UtensilsCrossed size={15} color={theme.accentRed} />
+                  <UtensilsCrossed size={15} color={theme.indigo} />
                   <span
                     className="text-sm font-bold"
                     style={{ color: theme.textPrimary, fontFamily: "'Noto Sans TC', sans-serif" }}
@@ -1920,7 +1986,7 @@ function TimelineStop({
 
             <div className="mt-4">
               <div className="flex items-center gap-1.5 mb-2">
-                <StickyNote size={15} color={theme.orange} />
+                <StickyNote size={15} color={theme.indigo} />
                 <span
                   className="text-sm font-bold"
                   style={{ color: theme.textPrimary, fontFamily: "'Noto Sans TC', sans-serif" }}
@@ -2112,17 +2178,24 @@ function ItineraryTab({
   );
   const [editingId, setEditingId] = useState(null);
   const [editValue, setEditValue] = useState("");
+  const [manualCurrentId, setManualCurrentId] = useState(null); // 管理者手動標記的目前位置，優先於 GPS
+  const [inTransit, setInTransit] = useState(false); // 是否正在遊覽車上移動
   const { liveData: liveWeather, isFetching: isWeatherFetching } = useDailyWeatherRefresh(day);
+
+  // 管理者手動標記優先；沒有手動標記時才用 GPS 偵測結果
+  const effectiveCurrentId = manualCurrentId || autoCurrentId;
 
   // 偵測到附近景點時，自動展開該站
   useEffect(() => {
     if (autoCurrentId) setExpandedId(autoCurrentId);
   }, [autoCurrentId]);
 
-  // 切換天數時，重設展開項與編輯狀態
+  // 切換天數時，重設展開項、編輯狀態與手動標記
   useEffect(() => {
     setExpandedId((day.stops.find((s) => s.status === "current") || day.stops[0]).id);
     setEditingId(null);
+    setManualCurrentId(null);
+    setInTransit(false);
   }, [dayIndex]);
 
   const startEdit = (stopId) => {
@@ -2156,6 +2229,28 @@ function ItineraryTab({
     updateDayStops(dayIndex, newStops);
   };
 
+  const markAsHere = (stopId) => {
+    setManualCurrentId(stopId);
+    setInTransit(false);
+  };
+
+  const leaveHere = () => {
+    setManualCurrentId(null);
+    setInTransit(false);
+  };
+
+  const toggleTransit = (currentStopId) => {
+    if (!inTransit) {
+      setInTransit(true);
+      return;
+    }
+    // 「已到站」：關閉行駛狀態，並自動把手動標記推進到下一站，減少要點的步驟
+    setInTransit(false);
+    const idx = stops.findIndex((s) => s.id === currentStopId);
+    const next = stops[idx + 1];
+    if (next) setManualCurrentId(next.id);
+  };
+
   return (
     <div className="pt-4 pb-6">
       <div className="px-4">
@@ -2172,21 +2267,6 @@ function ItineraryTab({
       <div className="px-4">
         <WeatherCard theme={theme} weather={day.weather} liveData={liveWeather} isFetching={isWeatherFetching} />
 
-        <p
-          className="text-xs mb-3 flex items-center gap-1"
-          style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}
-        >
-          {isAdmin ? (
-            <>
-              <Pencil size={11} /> 管理者模式（可編輯時間）
-            </>
-          ) : (
-            <>
-              <Eye size={11} /> 檢視模式
-            </>
-          )}
-        </p>
-
         <div>
           {stops.map((stop, i) => (
             <TimelineStop
@@ -2197,7 +2277,12 @@ function ItineraryTab({
               theme={theme}
               isLast={i === stops.length - 1}
               isAdmin={isAdmin}
-              isNearby={stop.id === autoCurrentId}
+              isNearby={stop.id === effectiveCurrentId}
+              isManuallySet={stop.id === manualCurrentId}
+              isTransitFromHere={inTransit && stop.id === effectiveCurrentId}
+              onMarkAsHere={() => markAsHere(stop.id)}
+              onLeaveHere={leaveHere}
+              onToggleTransit={() => toggleTransit(stop.id)}
               isEditing={editingId === stop.id}
               editValue={editValue}
               onStartEdit={startEdit}
@@ -3940,7 +4025,7 @@ function EmergencyModal({ theme, isOpen, onClose, day }) {
    設定面板：管理者登入／登出、重置資料
    ====================================================================== */
 
-function SettingsModal({ theme, isOpen, onClose, isAdmin, setIsAdmin, onReset, hasLocalStorage }) {
+function SettingsModal({ theme, isOpen, onClose, isAdmin, setIsAdmin, onReset, hasLocalStorage, isDark, setIsDark }) {
   const [pwInput, setPwInput] = useState("");
   const [pwError, setPwError] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
@@ -3996,6 +4081,26 @@ function SettingsModal({ theme, isOpen, onClose, isAdmin, setIsAdmin, onReset, h
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 py-4">
+          {/* 顯示外觀 */}
+          <p className="text-xs mb-2 font-bold" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+            顯示外觀
+          </p>
+          <button
+            onClick={() => setIsDark((d) => !d)}
+            className="w-full flex items-center gap-3 rounded-xl px-3 py-3 mb-5"
+            style={{ backgroundColor: theme.bgCard, border: `1px solid ${theme.border}` }}
+          >
+            <div className="flex items-center justify-center rounded-full flex-shrink-0" style={{ width: 32, height: 32, backgroundColor: theme.bgSunken }}>
+              {isDark ? <Sun size={16} color={theme.orange} /> : <Moon size={16} color={theme.indigo} />}
+            </div>
+            <span className="text-sm font-bold flex-1 text-left" style={{ color: theme.textPrimary, fontFamily: "'Noto Sans TC', sans-serif" }}>
+              {isDark ? "深色模式" : "淺色模式"}
+            </span>
+            <span className="text-xs" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+              點擊切換
+            </span>
+          </button>
+
           {/* 管理者區塊 */}
           <p className="text-xs mb-2 font-bold" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
             管理者模式
@@ -4136,8 +4241,6 @@ function SettingsModal({ theme, isOpen, onClose, isAdmin, setIsAdmin, onReset, h
 
 function Header({
   theme,
-  isDark,
-  setIsDark,
   day,
   dayIndex,
   totalDays,
@@ -4247,14 +4350,6 @@ function Header({
           aria-label="緊急聯絡卡"
         >
           <ShieldAlert size={15} color={theme.accentRed} />
-        </button>
-        <button
-          onClick={() => setIsDark((d) => !d)}
-          className="flex items-center justify-center rounded-full"
-          style={{ width: 32, height: 32, backgroundColor: theme.bgSunken }}
-          aria-label="切換深淺色模式"
-        >
-          {isDark ? <Sun size={16} color={theme.orange} /> : <Moon size={16} color={theme.indigo} />}
         </button>
         <button
           onClick={onOpenSettings}
@@ -4390,8 +4485,6 @@ export default function JapanTourApp() {
       >
         <Header
           theme={theme}
-          isDark={isDark}
-          setIsDark={setIsDark}
           day={day}
           dayIndex={safeDayIndex}
           totalDays={daysData.length}
@@ -4461,6 +4554,8 @@ export default function JapanTourApp() {
           setIsAdmin={setIsAdmin}
           onReset={resetAll}
           hasLocalStorage={HAS_LS}
+          isDark={isDark}
+          setIsDark={setIsDark}
         />
       </div>
     </div>
