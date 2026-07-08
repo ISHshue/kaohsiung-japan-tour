@@ -263,6 +263,22 @@ function categorizeOsmTags(tags) {
 
 const OSM_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 天內不重複查詢同一地點
 
+// 這個功能開發過程中資料格式調整過好幾次，使用者瀏覽器 localStorage 裡可能還留著
+// 舊版格式的快取資料（例如缺少 cat 欄位、cat 不是物件等）。如果不驗證就直接信任，
+// 渲染時讀取 place.cat.key 這類欄位會因為 undefined 而整個畫面白屏當機。
+function isValidPlacesArray(arr) {
+  if (!Array.isArray(arr)) return false;
+  return arr.every(
+    (p) =>
+      p &&
+      typeof p.name === "string" &&
+      p.cat &&
+      typeof p.cat.key === "string" &&
+      typeof p.cat.label === "string" &&
+      typeof p.dist === "number"
+  );
+}
+
 function useNearbyOSM(cacheKey, coords, radiusMeters) {
   const [cache, setCache] = useLocalStorage("osmCache", {});
   const cacheRef = useRef(cache);
@@ -276,10 +292,19 @@ function useNearbyOSM(cacheKey, coords, radiusMeters) {
 
     const run = async () => {
       const existing = cacheRef.current[cacheKey];
-      const isFresh = existing && Date.now() - existing.fetchedAt < OSM_CACHE_TTL_MS;
+      const existingValid = existing && isValidPlacesArray(existing.places);
+      const isFresh = existingValid && Date.now() - existing.fetchedAt < OSM_CACHE_TTL_MS;
       if (isFresh) {
         setStatus("ok");
         return;
+      }
+      if (existing && !existingValid) {
+        // 舊格式的壞資料，直接清掉這一筆，避免之後又被誤判成「有快取」
+        setCache((prev) => {
+          const next = { ...prev };
+          delete next[cacheKey];
+          return next;
+        });
       }
 
       setStatus("loading");
@@ -329,7 +354,8 @@ function useNearbyOSM(cacheKey, coords, radiusMeters) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cacheKey, coords?.lat, coords?.lng, radiusMeters]);
 
-  const places = cache[cacheKey]?.places || [];
+  const rawPlaces = cache[cacheKey]?.places;
+  const places = isValidPlacesArray(rawPlaces) ? rawPlaces : [];
   return { places, status, errorDetail };
 }
 
@@ -1457,8 +1483,9 @@ function CountdownTicket({ theme, targetTime }) {
 
 function OsmPlaceRow({ theme, place }) {
   const [isOpen, setIsOpen] = useState(false);
-  const Icon = CATEGORY_KEY_ICON[place.cat.key] || MapPin;
-  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.mapsQuery)}`;
+  const cat = place.cat || { key: "other", label: "其他" };
+  const Icon = CATEGORY_KEY_ICON[cat.key] || MapPin;
+  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.mapsQuery || place.name || "")}`;
 
   return (
     <div className="rounded-xl overflow-hidden" style={{ backgroundColor: theme.bgSunken, border: `1px solid ${theme.border}` }}>
@@ -1471,7 +1498,7 @@ function OsmPlaceRow({ theme, place }) {
             {place.name}
           </p>
           <p className="text-xs mt-0.5" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
-            {place.cat.label} ・ 約 {place.dist} 公尺
+            {cat.label} ・ 約 {place.dist} 公尺
           </p>
         </div>
         <ChevronDown size={14} color={theme.textSecondary} style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s ease", flexShrink: 0 }} />
@@ -3105,11 +3132,11 @@ function CategoryManagerModal({ theme, isOpen, onClose, categories, onAddCategor
               const count = itemCountByCategory[cat] || 0;
               return (
                 <div key={cat} className="flex items-center gap-3 rounded-xl px-3 py-2.5" style={{ backgroundColor: theme.bgCard, border: `1px solid ${theme.border}` }}>
-                  <span className="text-sm font-semibold flex-1" style={{ color: theme.textPrimary, fontFamily: "'Noto Sans TC', sans-serif" }}>
+                  <span className="text-sm font-semibold flex-1 min-w-0 truncate" style={{ color: theme.textPrimary, fontFamily: "'Noto Sans TC', sans-serif" }}>
                     {cat}
                   </span>
                   {count > 0 && (
-                    <span className="text-xs" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
+                    <span className="text-xs flex-shrink-0" style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}>
                       {count} 項商品使用中
                     </span>
                   )}
@@ -3196,10 +3223,10 @@ function MoreMenuModal({ theme, isOpen, onClose, onOpenItinerary, onOpenCoupons,
               <div className="flex items-center justify-center rounded-lg flex-shrink-0" style={{ width: 36, height: 36, backgroundColor: theme.bgSunken }}>
                 <row.icon size={17} color={theme.indigo} />
               </div>
-              <span className="text-sm font-bold flex-1 text-left" style={{ color: theme.textPrimary, fontFamily: "'Noto Sans TC', sans-serif" }}>
+              <span className="text-sm font-bold flex-1 min-w-0 truncate text-left" style={{ color: theme.textPrimary, fontFamily: "'Noto Sans TC', sans-serif" }}>
                 {row.label}
               </span>
-              <ChevronDown size={15} color={theme.textFaint} style={{ transform: "rotate(-90deg)" }} />
+              <ChevronDown size={15} color={theme.textFaint} style={{ transform: "rotate(-90deg)", flexShrink: 0 }} />
             </button>
           ))}
         </div>
@@ -4153,22 +4180,22 @@ function Header({
       className="sticky top-0 z-20 flex items-center justify-between px-4 py-3"
       style={{ backgroundColor: theme.navBg, borderBottom: `1px solid ${theme.border}` }}
     >
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 min-w-0 flex-1">
         <div
-          className="flex items-center justify-center rounded-lg"
+          className="flex items-center justify-center rounded-lg flex-shrink-0"
           style={{ width: 32, height: 32, backgroundColor: theme.indigo }}
         >
           <MapPin size={17} color="#fff" />
         </div>
-        <div>
+        <div className="min-w-0 flex-1">
           <p
-            className="text-sm leading-tight flex items-center gap-1.5"
+            className="text-sm leading-tight flex items-center gap-1.5 min-w-0"
             style={{ color: theme.textPrimary, fontFamily: "'Noto Serif TC', serif", fontWeight: 700 }}
           >
-            {day.dayLabel} ・ {day.cityLabel}
+            <span className="truncate">{day.dayLabel} ・ {day.cityLabel}</span>
             {isAdmin && (
               <span
-                className="text-xs px-1.5 py-0.5 rounded-full flex items-center gap-0.5"
+                className="text-xs px-1.5 py-0.5 rounded-full flex items-center gap-0.5 flex-shrink-0"
                 style={{ backgroundColor: theme.green, color: "#fff", fontFamily: "'Noto Sans TC', sans-serif", fontWeight: 700 }}
               >
                 <LockOpen size={9} /> 管理
@@ -4176,7 +4203,7 @@ function Header({
             )}
           </p>
           <p
-            className="text-xs leading-tight"
+            className="text-xs leading-tight truncate"
             style={{ color: theme.textFaint, fontFamily: "'Noto Sans TC', sans-serif" }}
           >
             行程進度 {dayIndex + 1} / {totalDays}
@@ -4184,7 +4211,7 @@ function Header({
         </div>
       </div>
 
-      <div className="flex items-center gap-1.5" style={{ position: "relative" }}>
+      <div className="flex items-center gap-1.5 flex-shrink-0" style={{ position: "relative" }}>
         <button
           onClick={handleTap}
           className="flex items-center justify-center rounded-full"
